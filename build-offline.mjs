@@ -1,13 +1,10 @@
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-const dir=path.dirname(fileURLToPath(import.meta.url));
-let html=await fs.readFile(path.join(dir,'index.html'),'utf8');
-html=html.replace('<link rel="stylesheet" href="style.css">','<style>'+await fs.readFile(path.join(dir,'style.css'),'utf8')+'</style>');
-for(const file of ['content.js','research.js','app.js','visual.js','pages.js']){
- const js=(await fs.readFile(path.join(dir,file),'utf8')).replace(/<\/script/gi,'<\\/script');
- html=html.replace('<script src="'+file+'"></script>',()=>'<script>'+js+'</script>');
-}
-await fs.writeFile(path.join(dir,'Seismic-Mission-offline.html'),html,'utf8');
-console.log('Updated Seismic-Mission-offline.html');
-
+const root=path.dirname(fileURLToPath(import.meta.url));
+let html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+html=html.replace('<link rel="stylesheet" href="style.css">',()=>'<style>\n'+fs.readFileSync(path.join(root,'style.css'),'utf8')+'\n</style>');
+html=html.replace(/<script src="([^"/]+\.js)"><\/script>/g,(_,name)=>'<script>\n'+fs.readFileSync(path.join(root,name),'utf8').replace(/<\/script/gi,'<\\/script')+'\n</script>');
+html=html.replace('</head>','<meta name="seismic-standalone" content="3.0">\n</head>');
+fs.writeFileSync(path.join(root,'Seismic-Mission-offline.html'),html);
+console.log('Built standalone offline presentation ('+Buffer.byteLength(html)+' bytes).');

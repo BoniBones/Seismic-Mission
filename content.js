@@ -1,55 +1,62 @@
+/* Seismic Mission 3.0 — educational content, independent of rendering. */
 'use strict';
-window.MISSION = {
-  labels: [['La llamada','The call'],['Tu apuesta','Your prediction'],['El laboratorio','The laboratory'],['Los expedientes','The case files'],['El consejo','The council'],['La decisión humana','The human decision'],['El informe','The debrief']],
+window.SM = window.SM || {};
+SM.content = {
+  title: 'Seismic Mission 3.0',
+  question: 'Why Do Earthquakes Damage Some Places More Than Others?',
+  chapters: [
+    ['Briefing', 'Curiosity', '1 min', 'Ask for two possible explanations. The opening neighbourhoods are fictional; the case studies are real.'],
+    ['First prediction', 'Curiosity', '2 min', 'Think silently for 10 seconds, compare ideas with a neighbour, then raise one hand for one option. Ask what information would change the prediction.'],
+    ['Source to site', 'Foundations', '2 min', 'Point to the source, the path, the local ground and the building. Ask which factors change between two sites during the same earthquake.'],
+    ['Ground laboratory', 'Foundations', '3 min', 'Keep the reference fixed. Change only ground or structure. Hear a prediction before revealing the mechanism. This diagram is not a damage calculator.'],
+    ['Below the surface', 'Foundations', '2 min', 'Step through the mechanism. Ask: does the soil literally turn into water? No. Susceptible saturated soil loses strength.'],
+    ['Real case files', 'Evidence', '4 min', 'Visit both case files. Ask one group to cite a ground observation and another to cite a structural observation. Separate evidence from an inference.'],
+    ['Connections matter', 'Evidence', '2 min', 'Compare load paths and connections, not just the age of buildings. Modern does not mean invulnerable.'],
+    ['Earthquake investigator', 'Application', '3 min', 'For each check: think, discuss, tally, record a reason, close voting, then reveal. These are group responses, not individual grades.'],
+    ['The town council', 'Application', '3 min', 'Groups of 3–4 propose a plan aloud. Hear two plans. Record one class decision, its scientific reason and an unresolved risk. There is no single winning budget.'],
+    ['Who gets protected?', 'Application', '2 min', 'Reveal the fictional residents’ situation. Invite a peer to name one strength and one improvement to the class explanation. Revise the plan if needed.'],
+    ['Class pulse', 'Reflection', '2 min', 'Count each student at most once per question. Five short rubric rounds plus a new-concept vote; the final example vote is optional. Skip any item if time is short.'],
+    ['Explain it back', 'Reflection', '2 min', 'Hear two or three new-learning statements and one application explanation. A neighbour gives one scientific strength and one improvement. Record short paraphrases without names.'],
+    ['Faculty review', 'Evaluation', '3–5 min', 'The teacher can use this computer or dictate. Each criterion can be scored or marked not observed. Review the whole response before confirming. This can be skipped and revisited.'],
+    ['Learning evidence', 'Evaluation', '1 min', 'Check completed sample sizes and distinguish confidence from demonstrated answers. Export a backup and a printable report before clearing anything.'],
+    ['Mission debrief', 'Conclusion', '1 min', 'Return to the opening question. Ask the class to explain a cause, cite evidence and name one uncertainty.']
+  ],
   sources: [
-    ['USGS · Loma Prieta, 1989','https://www.usgs.gov/programs/earthquake-hazards/science/m-69-october-17-1989-loma-prieta-earthquake'],
-    ['NIST · Loma Prieta engineering investigation','https://www.nist.gov/el/earthquake-loma-prieta-california-1989'],
-    ['AIDR · Christchurch, 2011','https://knowledge.aidr.org.au/resources/earthquake-christchurch-new-zealand-2011/'],
-    ['USGS · Magnitude and intensity','https://www.usgs.gov/faqs/what-difference-between-earthquake-magnitude-and-earthquake-intensity-what-modified-mercalli'],
-    ['Francis (2015) · Laudato Si’, §§150–152, 158','https://www.vatican.va/content/francesco/en/encyclicals/documents/papa-francesco_20150524_enciclica-laudato-si.html']
+    {id:'paper', title:'Original project research', note:'Preserved in full; documentary comparison of Loma Prieta and Christchurch.'},
+    {id:'usgs-intensity',title:'USGS · Magnitude and intensity',url:'https://www.usgs.gov/faqs/what-difference-between-earthquake-magnitude-and-earthquake-intensity-what-modified-mercalli',note:'Earthquake size at the source versus shaking and effects at a location.'},
+    {id:'usgs-liquefaction',title:'USGS · What is liquefaction?',url:'https://www.usgs.gov/faqs/what-liquefaction',note:'Strength loss in loose, waterlogged sediment under strong shaking.'},
+    {id:'usgs-loma',title:'USGS · Loma Prieta, 1989',url:'https://www.usgs.gov/programs/earthquake-hazards/science/m-69-october-17-1989-loma-prieta-earthquake',note:'Original bibliography source; local geology and earthquake effects.'},
+    {id:'nist',title:'NIST · Loma Prieta engineering investigation',url:'https://www.nist.gov/el/earthquake-loma-prieta-california-1989',note:'17 October 1989, magnitude 6.9; structural failures including Cypress Street Viaduct.'},
+    {id:'geonet',title:'GeoNet / GNS Science · Christchurch, 2011',url:'https://www.geonet.org.nz/earthquake/story/3468575',note:'22 February 2011; proximity and shallow depth contributed to severe city shaking. Its heading reports M6.2; its narrative also gives local magnitude ML6.3.'},
+    {id:'aidr',title:'AIDR · Christchurch disaster record',url:'https://knowledge.aidr.org.au/resources/earthquake-christchurch-new-zealand-2011/',note:'Historical account used by the original paper. Counts and magnitude conventions differ across sources; they are not compared as identical measures here.'},
+    {id:'damage',title:'USGS · Why damage differs between earthquakes',url:'https://www.usgs.gov/faqs/why-do-earthquakes-other-countries-seem-cause-more-damage-and-casualties-earthquakes-us',note:'The original bibliography labels this link as NZHistory; the destination is a USGS FAQ.'},
+    {id:'laudato',title:'Francis (2015) · Laudato Si’, §§150–152, 158',url:'https://www.vatican.va/content/francesco/en/encyclicals/documents/papa-francesco_20150524_enciclica-laudato-si.html',note:'Housing, residents’ participation and concern for people in poverty. Applied here as an ethical perspective, not a seismic mechanism.'}
   ],
-  options: [
-    {id:'A',cost:5,name:['Reforzar la escuela','Strengthen the school'],desc:['Escuela antigua de ladrillo sobre terreno firme.','Older brick school on firm ground.']},
-    {id:'B',cost:4,name:['Reforzar las viviendas','Strengthen the homes'],desc:['Mejorar las estructuras de viviendas sobre arena saturada.','Improve housing structures on saturated sand.']},
-    {id:'C',cost:4,name:['Mejorar terreno y cimientos','Improve ground and foundations'],desc:['Intervención especializada en esas mismas viviendas.','Specialist intervention for those same homes.']},
-    {id:'D',cost:2,name:['Preparar a la comunidad','Prepare the community'],desc:['Simulacros e información accesible. No evita colapsos.','Drills and accessible information. Does not prevent collapse.']}
+  polls: [
+    {id:'prediction',kind:'prediction',title:'Which neighbourhood is generally less vulnerable under these assumptions?',options:['Riverside: loose saturated sand + unreinforced homes','Hilltop: firm rock + well-designed seismic connections','I need more evidence / not sure'],answer:1,explanation:'Hilltop is generally less vulnerable under the stated conditions. This is not a guarantee: actual shaking, foundations, design details and construction quality still matter. The two neighbourhoods belong to the same earthquake; they do not have different source magnitudes.'},
+    {id:'investigator',kind:'knowledge',title:'Sand appears at the surface. Foundations settle, while some walls remain intact. Which explanation best fits?',options:['Only the age of the building matters','Liquefaction and ground movement may have damaged the foundations','The earthquake had a different magnitude at each house','Not sure / pass'],answer:1,explanation:'In susceptible saturated soils, shaking can cause strength loss. Settlement and lateral movement can damage foundations. These clues support liquefaction, but an engineering investigation must also examine the structure and local shaking.'},
+    {id:'transfer',kind:'knowledge',title:'Two similar buildings, at similar fault distances, experience the same earthquake. One stands on soft soil. What can we conclude?',options:['They must have identical damage because magnitude is the same','The soft-soil building must collapse','Local ground can change shaking; damage also depends on the structure','Not sure / pass'],answer:2,explanation:'The earthquake’s magnitude describes the source. Local ground can alter shaking, and structural response matters. Soft soil does not guarantee collapse and rock does not guarantee safety.'},
+    {id:'understanding',kind:'rubric',title:'I understand why damage can vary within one earthquake.',options:['1 · I still need an explanation','2 · I can name a factor with help','3 · I can explain the main factors','4 · I can connect the factors and their limits','Pass / not rated']},
+    {id:'explain',kind:'rubric',title:'I could explain one new scientific concept to a classmate.',options:['1 · I cannot explain it yet','2 · I can explain part with help','3 · I can explain it with an example','4 · I can explain it and correct a misconception','Pass / not rated']},
+    {id:'connect',kind:'rubric',title:'I can connect the research to a real place or building.',options:['1 · I cannot make a link yet','2 · I can make a link with a prompt','3 · I can connect one case to a real situation','4 · I can compare cases and say what is uncertain','Pass / not rated']},
+    {id:'confidence',kind:'rubric',title:'I feel confident applying this learning to a new situation.',options:['1 · Not confident yet','2 · Confident with guidance','3 · Confident explaining a likely outcome','4 · Confident explaining both an outcome and a limit','Pass / not rated']},
+    {id:'clarity',kind:'rubric',title:'The explanations and activities helped me follow the research.',options:['1 · Mostly difficult to follow','2 · Some parts helped','3 · Mostly clear and engaging','4 · Clear and engaging throughout','Pass / not rated']},
+    {id:'newconcept',kind:'concept',title:'Which ONE concept was new to you today?',options:['Magnitude is different from local intensity','Soft soil can amplify some shaking','Liquefaction can damage foundations','Connections and reinforcement matter','Several factors interact / unequal access to protection','None of these / pass']},
+    {id:'example',kind:'experience',optional:true,title:'Which example helped you understand most?',options:['The ground and building laboratory','Loma Prieta','Christchurch','The town council and peer discussion','Not sure / pass']}
   ],
-  cases: {
-    loma: {
-      date:'17 OCT 1989 / CALIFORNIA',year:'1989',
-      title:['Daños lejos del epicentro','Damage far from the epicentre'],
-      intro:['La magnitud 6,9 no explica por sí sola por qué algunos lugares de San Francisco y Oakland sufrieron tanto.','Magnitude 6.9 alone cannot explain why parts of San Francisco and Oakland suffered so much.'],
-      clue:['La distancia importa. El terreno también.','Distance matters. So does the ground.'],
-      ground:['Suelos blandos amplificaron el movimiento. Arena saturada y rellenos de la bahía sufrieron licuefacción. El Marina District mostró problemas de soporte y de sacudida.','Soft soils amplified shaking. Saturated sand and bay fills experienced liquefaction. The Marina District showed both shaking and ground-support problems.'],
-      buildings:['Edificios sin refuerzo y estructuras vulnerables sufrieron daños graves. El colapso del Cypress Street Viaduct muestra por qué también importa el diseño estructural.','Unreinforced buildings and vulnerable structures suffered serious damage. The Cypress Street Viaduct collapse shows why structural design matters too.'],
-      limits:['La cercanía a la falla no explica todos los contrastes. Geología local y debilidades estructurales se combinan con el movimiento sísmico.','Fault distance does not explain every contrast. Local geology and structural weaknesses combine with earthquake motion.'],
-      source:0
-    },
-    christchurch: {
-      date:'22 FEB 2011 / NEW ZEALAND',year:'2011',
-      title:['Cuando falla el apoyo','When the ground gives way'],
-      intro:['Christchurch sufrió daños más graves que durante el terremoto de Darfield de 2010, de mayor magnitud.','Christchurch suffered more severe damage than during the larger-magnitude Darfield earthquake in 2010.'],
-      clue:['Una casa puede dañarse porque el suelo se mueve.','A house can be damaged because its ground moves.'],
-      ground:['En suburbios orientales, arena y agua salieron a la superficie. Grietas, hundimientos y movimientos laterales afectaron viviendas, calles y redes de servicios.','In eastern suburbs, sand and water reached the surface. Cracks, settlement and lateral movement affected homes, roads and infrastructure.'],
-      buildings:['La mampostería sin refuerzo fue vulnerable. También colapsaron dos edificios modernos de oficinas de hormigón: moderno no significa invulnerable.','Unreinforced masonry was vulnerable. Two modern concrete office buildings also collapsed: modern does not mean invulnerable.'],
-      limits:['La cercanía a la ciudad y la poca profundidad contribuyeron a una sacudida extrema. Comparar solamente magnitudes da una explicación incompleta.','Proximity to the city and shallow depth contributed to extreme shaking. Comparing magnitudes alone gives an incomplete explanation.'],
-      source:2
-    }
-  },
-  science:[
-    {title:['Magnitud e intensidad','Magnitude and intensity'],text:['La magnitud describe el tamaño del terremoto y se relaciona con la energía liberada. La intensidad describe sus efectos en un lugar. Un mismo terremoto puede producir intensidades distintas según el sitio.','Magnitude describes earthquake size and relates to energy released. Intensity describes effects at a location. One earthquake can produce different intensities at different sites.']},
-    {title:['Amplificación y licuefacción','Amplification and liquefaction'],text:['Un suelo blando puede amplificar ciertas ondas sísmicas. En la licuefacción, el aumento de presión del agua entre los granos reduce la resistencia de suelos susceptibles y saturados. No se convierten literalmente en agua. Pueden hundirse o desplazarse lateralmente, dañando cimientos, calles y cañerías.','Soft soil can amplify certain seismic waves. In liquefaction, increased water pressure between grains reduces the strength of susceptible saturated soils. They do not literally turn into water. Settlement or lateral movement can damage foundations, roads and pipes.']},
-    {title:['¿Un edificio nuevo siempre es seguro?','Is a new building always safe?'],text:['No. Importan materiales, peso, altura, conexiones, cimientos y calidad del diseño y su ejecución. El refuerzo y la ductilidad ayudan a resistir fuerzas. Incluso un buen edificio puede sufrir daños ante movimientos extremos.','No. Materials, weight, height, connections, foundations and design and construction quality matter. Reinforcement and ductility help resist forces. Even a good building can suffer damage under extreme motion.']},
-    {title:['Cómo pusimos a prueba la hipótesis','How we investigated the hypothesis'],text:['La hipótesis predice más daños en terrenos débiles o edificios vulnerables. Comparamos suelo, construcción y otros factores en informes e inspecciones de dos terremotos. Es investigación documental, no un experimento controlado ni trabajo de campo propio. Ambos casos apoyan la hipótesis, pero no aíslan todos los factores ni permiten predecir cada daño.','The hypothesis predicts more damage on weak ground or in vulnerable buildings. We compared ground, construction and other factors in reports and inspections from two earthquakes. This is documentary research, not a controlled experiment or our own fieldwork. Both cases support the hypothesis, but do not isolate every factor or predict every outcome.']}
+  faculty: [
+    {id:'accuracy',title:'Scientific accuracy',levels:['Major errors or unsupported claims','Some errors or important qualifications missing','Accurate core ideas; minor gaps','Accurate, sourced and appropriately qualified']},
+    {id:'clarity',title:'Clarity of explanations',levels:['Mostly inaccessible for this age group','Several explanations need support','Mostly clear with useful examples','Clear, precise and accessible throughout']},
+    {id:'engagement',title:'Student engagement',levels:['Little opportunity to participate','Participation limited or uneven','Most students had useful opportunities','Inclusive thinking, discussion and explanation']},
+    {id:'value',title:'Educational value',levels:['Little relevant learning evidence','Some learning; important gaps remain','Relevant concepts demonstrated','Application and reasoning clearly demonstrated']},
+    {id:'structure',title:'Presentation structure',levels:['Sequence difficult to follow','Some weak links or pacing issues','Logical sequence and workable pace','Coherent progression with effective transitions']},
+    {id:'activities',title:'Effectiveness of interactive activities',levels:['Activities obscure the learning goal','Activities partly support understanding','Activities support the key concepts','Predictions, feedback and reasoning deepen learning']},
+    {id:'quality',title:'Visual and technical quality',levels:['Readability or reliability prevents use','Several usability or technical problems','Clear and reliable with minor issues','Readable, accessible and technically smooth']}
   ],
-  prompts:[
-    ['2 min. Preguntá: “¿Qué lugar de nuestro barrio no querrían perder?”. Escuchá dos respuestas antes de explicar. No pidas experiencias personales de desastres. La misión busca curiosidad, no miedo.','2 min. Ask: “Which place in our neighbourhood would you hate to lose?” Hear two answers before explaining. Do not ask for personal disaster experiences. Aim for curiosity, not fear.'],
-    ['3 min. Pedí manos arriba y registrá la opción predominante. Preguntá qué dato les haría cambiar de opinión. Esta pantalla registra una decisión del curso, no recoge votos desde otros dispositivos.','3 min. Take a show of hands and record the leading choice. Ask what evidence would change their mind. This screen records one class decision, not votes from other devices.'],
-    ['5 min. Elegí dos alumnos como operadores. Cambien una variable por vez. Comparen roca y suelo blando con el mismo edificio. Después prueben arena saturada con refuerzo: el problema de cimientos puede seguir.','5 min. Choose two students as operators. Change one variable at a time. Compare rock and soft soil with the same building. Then try saturated sand with reinforcement: foundation problems can remain.'],
-    ['6 min. Un lado del aula defiende la importancia del suelo y otro la de los edificios. Cada lado cita una evidencia. Después expliquen por qué necesitamos ambas perspectivas.','6 min. One side argues for ground conditions, the other for buildings. Each side cites evidence. Then explain why both perspectives are needed.'],
-    ['5 min. Equipos de 3–4: presupuesto, ciencia y vecinos. Todos escriben en papel; registrá un plan del curso en pantalla. Escuchá dos planes distintos antes de continuar.','5 min. Teams of 3–4: budget, science and residents. Everyone plans on paper; record one class plan on screen. Hear two different plans before continuing.'],
-    ['4 min. Preguntá: “¿A quién no escuchamos todavía?”. No impongas una única respuesta. Vinculá solidaridad con decisiones concretas. La escuela y las viviendas tienen necesidades legítimas.','4 min. Ask whose voice is still missing. Do not impose one answer. Connect solidarity with concrete decisions. Both the school and the homes have legitimate needs.'],
-    ['3 min. Evaluá 0–2 por criterio: presupuesto, ciencia, atención a vecinos vulnerables y riesgos pendientes. B+C+D=10 deja la escuela sin refuerzo. A+B=9 deja el terreno de las viviendas. Premia la argumentación, no un plan “ganador”.','3 min. Score 0–2 for each: budget, science, concern for vulnerable residents and remaining risks. B+C+D=10 leaves the school unstrengthened. A+B=9 leaves housing ground risk. Reward reasoning, not a “winning” plan.']
+  budget: [
+    {id:'school',cost:5,title:'Strengthen the school',detail:'An older brick school on firm ground. Improve vulnerable structural connections.'},
+    {id:'homes',cost:4,title:'Strengthen the homes',detail:'Improve housing structures on loose saturated sand. Ground risk remains.'},
+    {id:'ground',cost:4,title:'Improve ground & foundations',detail:'Specialist intervention for those same homes. Structural weaknesses may remain.'},
+    {id:'prepare',cost:2,title:'Prepare the community',detail:'Accessible information and drills. These do not prevent structural collapse.'}
   ]
 };
-
