@@ -11,7 +11,7 @@ An English-language, presenter-controlled science exhibition for students aged 1
 3. Open **Session**. Set the presentation date, optional class label and optional number of students.
 4. Use **Fullscreen**, then **Begin the investigation**. Run the discussion with students speaking and raising hands; the presenter controls everything.
 
-No installation or internet connection is needed for the standalone file. You can also open `index.html` directly if its neighbouring CSS/JS files remain together. Source bibliography links need internet; they are not required to teach the lesson.
+No installation or internet connection is needed. In release **3.0.1**, both `index.html` and `Seismic-Mission-offline.html` contain the complete application, styles and research; either file can be opened on its own. Source bibliography links need internet; they are not required to teach the lesson.
 
 **Before presenting:** open the file on the actual presentation computer, check fullscreen/projector readability, make a test tally and export a backup. Start a new empty class afterwards. Real-browser/projector QA was unavailable in the development environment; see [testing.md](docs/testing.md) for the exact verification boundary.
 
@@ -38,7 +38,7 @@ The teacher review can be skipped during the lesson and completed later. Any act
 - Keyboard shortcuts do not interrupt inputs, links, buttons or dialogs.
 - The discussion timer cycles between 30, 60 and 180 seconds. Start/pause/reset it explicitly. It pauses when navigating or opening a dialog and never advances a section automatically.
 - Motion is restrained and can be disabled in Session. System reduced-motion preferences are respected. Every mechanism also has a text explanation.
-- Long sections and teacher forms scroll rather than clip at smaller sizes. The layout has a 16:9 desktop design with responsive mobile fallbacks.
+- **Fit slide** (on by default) scales a slide to the available content area when needed. It recalculates after reveals, window resizing and fullscreen changes. Turn it off for full-size text. The header/footer stay inside the viewport. Long forms and results remain readable and scroll only inside the content area; “Scroll content ↓” indicates this. Mobile layouts use full-size scrolling content. No evaluation data is changed by fitting.
 
 ## Participation and honest assessment
 
@@ -81,7 +81,7 @@ Browser local storage may be cleared or behave differently for local `file:` URL
 
 ## Publish with GitHub Pages
 
-This is a static site with relative paths and `.nojekyll`; no framework, package installation, server, secret, build service or database is needed.
+This is a static site with a self-contained root `index.html` and `.nojekyll`; no framework, package installation, server, secret, build service or database is needed. All critical CSS/JavaScript is inline, so an older cached asset or a copied HTML file cannot load an incompatible mix of v1 and v3 modules.
 
 The version 3 work is delivered on a dedicated branch and pull request. **Main is not changed or deployed automatically.** After reviewing and merging the PR yourself:
 
@@ -89,6 +89,10 @@ The version 3 work is delivered on a dedicated branch and pull request. **Main i
 2. Choose **Deploy from a branch**.
 3. Select `main` and `/(root)`, then save.
 4. Use the Pages URL shown by GitHub after its deployment completes. For the existing repository, the expected project path is `https://BoniBones.github.io/Seismic-Mission/`; check GitHub’s displayed status before sharing it.
+
+To try version 3 on Pages **before merging**, choose `codex/seismic-mission-3-0` and `/(root)` instead of `main` in Settings → Pages. The selected publishing branch determines the live version; updating a PR does not update a site that still publishes from `main`. Wait for the Pages build and deployment run to succeed.
+
+If the page shows an empty stage or mismatched bars, first check the published branch and deployment commit, then reload with **Ctrl+Shift+R** (macOS: **Cmd+Shift+R**). The header for this fix reads **3.0.1 / CLASSROOM**. The old split-file version could mix a cached shell with assets from a different deployment. The new single-document build removes that asset mismatch, but an entirely cached older page still needs reloading.
 
 A branch ZIP is source code, not a deployed website. For classroom reliability, keep the standalone HTML locally even when using a hosted version. The hosted page does not install a service worker: a first visit without network is not supported. Offline use is provided by the downloaded standalone file (or the complete local project).
 
@@ -104,7 +108,7 @@ npm run build
 npm test
 ```
 
-Run the offline builder after editing source files. It embeds the CSS, modules and full original research into `Seismic-Mission-offline.html`. The tests check that the generated file matches the sources.
+Run the builder after editing source files. It reads `src/shell.html` and embeds the CSS, modules and full original research into **both** `index.html` and `Seismic-Mission-offline.html`. Commit both generated files. Do not edit the generated HTML directly: the next build replaces it. Tests check that both files are identical and match the sources, and execute the inline published bundle through the simulated classroom flow.
 
 | File | Responsibility |
 |---|---|
@@ -112,6 +116,8 @@ Run the offline builder after editing source files. It embeds the CSS, modules a
 | `core.js` | Versioned state validation, vote rules, evidence model, CSV and JSON backup logic |
 | `visual.js` | Accessible, labelled SVG mechanism diagrams |
 | `pages.js` | Presentation and form rendering; user text is escaped |
+| `src/shell.html` | Editable application shell; the builder generates the deployable HTML |
+| `layout.js` | Available-space measurement, slide fitting, resize/fullscreen recovery |
 | `app.js` | Navigation, local persistence, input handling, timer, dialogs and downloads |
 | `report.js` | Complete screen/HTML/print report generated from the evidence model |
 | `research.js` | Unaltered original project paper |

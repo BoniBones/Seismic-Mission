@@ -6,9 +6,9 @@ import {fileURLToPath} from 'node:url';
 export const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 export const plain=value=>JSON.parse(JSON.stringify(value));
-export function logic(){const ctx={console,Date,Math,JSON,crypto:{randomUUID:()=>Math.random().toString(36)},setTimeout,clearTimeout};ctx.window=ctx;vm.createContext(ctx);for(const name of ['content.js','core.js','visual.js','research.js','report.js','pages.js'])vm.runInContext(read(name),ctx,{filename:name});return ctx.SM}
+export function logic(){const ctx={console,Date,Math,JSON,crypto:{randomUUID:()=>Math.random().toString(36)},setTimeout,clearTimeout};ctx.window=ctx;vm.createContext(ctx);for(const name of ['content.js','core.js','visual.js','research.js','report.js','pages.js','layout.js'])vm.runInContext(read(name),ctx,{filename:name});return ctx.SM}
 function decode(s){return String(s).replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')}
-export function boot({saved,previous,failStorage=false,standalone=false}={}){
+export function boot({saved,previous,failStorage=false,standalone=false,bundle=false}={}){
  const memory=new Map(),events=new Map(),downloads=[],timers=[];
  if(saved!==undefined)memory.set('seismic-mission-v3',saved);
  if(previous!==undefined)memory.set('seismic-mission-v3-previous',previous);
@@ -33,14 +33,17 @@ export function boot({saved,previous,failStorage=false,standalone=false}={}){
   click(){if(this.tagName==='A'&&this.download)downloads.push({name:this.download,url:this.href});else fire('click',this)}
   remove(){this.isConnected=false;if(this.id)doc.nodes.delete(this.id)}
  }
- doc.body=new Node('body');doc.body.innerHTML=read('index.html');doc.documentElement=new Node('html');doc.documentElement.requestFullscreen=async()=>{doc.fullscreenElement=doc.documentElement};doc.exitFullscreen=async()=>{doc.fullscreenElement=null};doc.createElement=tag=>new Node(tag);doc.activeElement=doc.body;
+ const markup=read(bundle?'index.html':'src/shell.html');
+ doc.body=new Node('body');doc.body.innerHTML=markup.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');doc.documentElement=new Node('html');doc.documentElement.requestFullscreen=async()=>{doc.fullscreenElement=doc.documentElement};doc.exitFullscreen=async()=>{doc.fullscreenElement=null};doc.createElement=tag=>new Node(tag);doc.activeElement=doc.body;
  if(standalone)doc.body.children.push(new Node('meta','name="seismic-standalone"'));
  // Parsed controls live in their container for selector/focus tests.
  const stage=doc.getElementById('stage'),dialog=doc.getElementById('dialog'),dialogBody=doc.getElementById('dialog-body');
  dialog.children.push(new Node('button','data-action="close-modal"'),dialogBody);dialogBody.parent=dialog;
  const blobs=new Map();let nextBlob=0;
  const ctx={console,Date,Math,JSON,Blob,document:doc,location:{protocol:'file:'},crypto:{randomUUID:()=>Math.random().toString(36)},localStorage:{getItem:k=>{if(storageThrows)throw Error('blocked storage');return memory.get(k)??null},setItem:(k,v)=>{if(storageThrows)throw Error('quota');memory.set(k,v)},removeItem:k=>{if(storageThrows)throw Error('blocked');memory.delete(k)}},URL:{createObjectURL:blob=>{const key='blob:test-'+nextBlob++;blobs.set(key,blob);return key},revokeObjectURL:key=>blobs.delete(key)},setTimeout:fn=>{timers.push(fn);return timers.length},clearTimeout:()=>{},setInterval:fn=>{ctx.tick=fn;return 1},addEventListener:(type,fn)=>doc.addEventListener(type,fn),print:()=>{ctx.printed=true}};
- ctx.window=ctx;vm.createContext(ctx);for(const name of ['content.js','core.js','visual.js','research.js','report.js','pages.js','app.js'])vm.runInContext(read(name),ctx,{filename:name});
+ ctx.window=ctx;vm.createContext(ctx);
+ if(bundle){for(const [i,m] of [...markup.matchAll(/<script>([\s\S]*?)<\/script>/g)].entries())vm.runInContext(m[1],ctx,{filename:'index.html script '+i})}
+ else for(const name of ['content.js','core.js','visual.js','research.js','report.js','pages.js','layout.js','app.js'])vm.runInContext(read(name),ctx,{filename:name});
  async function fire(type,target,extra={}){const event={target,key:'',prevented:false,preventDefault(){this.prevented=true},...extra};for(const fn of events.get(type)||[])await fn(event);return event}
  function control(action,values={}){const found=[...stage.querySelectorAll('[data-action]'),...dialog.querySelectorAll('[data-action]'),...doc.body.querySelectorAll('[data-action]')].find(n=>n.dataset.action===action&&Object.entries(values).every(([k,v])=>n.dataset[k]===String(v)));if(!found)throw Error('Control not rendered: '+action+' '+JSON.stringify(values));return found}
  return {SM:ctx.SM,ctx,doc,memory,downloads,blobs,fire,control,click:async(action,values={})=>{const el=control(action,values);if(el.disabled)throw Error('Control disabled: '+action);await fire('click',el)},input:async(id,value,type='input')=>{const node=doc.getElementById(id);if(!node)throw Error('Input not rendered: '+id);node.value=String(value);await fire(type,node)},setStorageFailure:v=>storageThrows=v,read};

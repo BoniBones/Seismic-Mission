@@ -5,7 +5,7 @@ import path from 'node:path';
 import {boot,root,plain,logic} from './harness.mjs';
 const key='seismic-mission-v3';
 test('representative full classroom flow: navigation, both knowledge checks, peer sample, faculty confirmation, report and exports',async()=>{
- const x=boot(),s=()=>x.SM.app.state;
+ const x=boot({bundle:true}),s=()=>x.SM.app.state;
  await x.click('session');await x.input('session.label','Third year');await x.input('session.size',24,'change');await x.input('session.date','2026-10-19','change');await x.click('close-modal');
  await x.click('next');assert.equal(s().ui.slide,1);
  await x.input('count-prediction-1',16,'change');await x.input('count-prediction-2',8,'change');await x.click('complete-poll',{id:'prediction'});await x.click('reveal-poll',{id:'prediction'});assert.equal(s().polls.prediction.revealed,true);
@@ -32,6 +32,83 @@ test('storage denial leaves application operable and exposes backup/reload prote
 test('reset is deliberate and clears both current feedback and recovery copy',async()=>{const x=boot();await x.click('next');await x.input('count-prediction-1',5,'change');await x.click('session');await x.click('reset-request');await x.click('reset-confirm');assert.equal(x.SM.app.state.polls.prediction.counts[1],5);await x.input('reset-word','CLEAR');await x.click('reset-confirm');assert.equal(x.SM.app.state.polls.prediction.counts[1],0);assert.equal(x.SM.app.state.ui.slide,0);assert.equal(x.memory.has(key+'-previous'),false)});
 test('timer pauses on navigation and never advances the slide; fullscreen has functional fallback',async()=>{const x=boot();await x.click('timer-toggle');const old=x.SM.app.state.timer;x.ctx.tick();assert.equal(x.SM.app.state.timer,old-1);await x.click('next');const stopped=x.SM.app.state.timer;x.ctx.tick();assert.equal(x.SM.app.state.timer,stopped);x.SM.app.state.timer=1;await x.click('timer-toggle');x.ctx.tick();assert.equal(x.SM.app.state.ui.slide,1);await x.click('fullscreen');assert.ok(x.doc.fullscreenElement);x.doc.documentElement.requestFullscreen=undefined;x.doc.fullscreenElement=null;await x.click('fullscreen');assert.ok(x.doc.getElementById('notice').textContent.includes('unavailable'))});
 test('all rendered data-action controls are wired and SVG labels exist',()=>{const x=boot();for(let i=0;i<15;i++){x.SM.app.go(i);const html=x.doc.getElementById('stage').innerHTML;for(const m of html.matchAll(/data-action="([^"]+)"/g))assert.equal(typeof x.SM.app.actions[m[1]],'function',m[1]);for(const m of html.matchAll(/<svg([^>]+)>/g))assert.ok(m[1].includes('aria-label=')||m[1].includes('aria-hidden='))}});
-test('standalone build has no runtime external dependencies and embeds identical modules',()=>{const html=fs.readFileSync(path.join(root,'Seismic-Mission-offline.html'),'utf8');assert.ok(!/<script[^>]+src=/.test(html));assert.ok(!/<link[^>]+rel="stylesheet"/.test(html));assert.ok(html.includes('seismic-standalone'));for(const name of ['content.js','core.js','visual.js','research.js','report.js','pages.js','app.js'])assert.ok(html.includes(fs.readFileSync(path.join(root,name),'utf8').replace(/<\/script/gi,'<\\/script')),name);assert.ok(!/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket/.test(fs.readFileSync(path.join(root,'app.js'),'utf8')))});
+test('standalone build has no runtime external dependencies and embeds identical modules',()=>{const html=fs.readFileSync(path.join(root,'Seismic-Mission-offline.html'),'utf8');assert.ok(!/<script[^>]+src=/.test(html));assert.ok(!/<link[^>]+rel="stylesheet"/.test(html));assert.ok(html.includes('seismic-standalone'));assert.equal(html,fs.readFileSync(path.join(root,'index.html'),'utf8'));for(const name of ['content.js','core.js','visual.js','research.js','report.js','pages.js','layout.js','app.js'])assert.ok(html.includes(fs.readFileSync(path.join(root,name),'utf8').replace(/<\/script/gi,'<\\/script')),name);assert.ok(!/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket/.test(fs.readFileSync(path.join(root,'app.js'),'utf8')))});
 test('responsive and print contracts retain 1080p layout, reduced motion, scroll recovery and complete reports',()=>{const css=fs.readFileSync(path.join(root,'style.css'),'utf8');assert.ok(css.includes('min-height:950px'));assert.ok(css.includes('max-width:680px'));assert.ok(css.includes('prefers-reduced-motion'));assert.ok(css.includes('overflow:auto'));assert.ok(css.includes('@media print'));assert.ok(css.includes('.print-area{display:block!important}'));const x=boot();x.SM.app.go(3);x.SM.app.actions.print();assert.ok(x.doc.getElementById('print-report').innerHTML.includes('Faculty evaluation'));assert.ok(x.doc.getElementById('print-report').innerHTML.includes('No responses recorded'))});
 test('typing a count does not replace the focused input or swallow the next button click',async()=>{const x=boot();x.SM.app.go(7);const input=x.doc.getElementById('count-investigator-1'),complete=x.control('complete-poll',{id:'investigator'});await x.input('count-investigator-1',12,'change');assert.equal(input.isConnected,true);assert.equal(x.control('complete-poll',{id:'investigator'}),complete);await x.click('complete-poll',{id:'investigator'});assert.equal(x.SM.app.state.polls.investigator.status,'completed')});
+
+test('fit calculations contain a full slide at projector, laptop and 125% zoom dimensions',()=>{
+ const {fitScale}=logic().layout;
+ // Explicit geometry fixtures, not measurements from a real browser.
+ for(const [width,height,slideWidth,slideHeight] of [[1720,864,1600,920],[1340,658,1340,790],[1210,664,1210,810],[1190,664,1190,680]]){
+  const scale=fitScale(width,height,slideWidth,slideHeight);
+  assert.ok(scale>=.7&&scale<=1);
+  assert.ok(slideHeight*scale<=height);
+  assert.ok(slideWidth*scale<=width);
+ }
+ assert.equal(fitScale(1600,900,1500,750),1,'no unnecessary enlargement');
+});
+
+test('long forms, small screens and disabled fitting keep readable full-size content',()=>{
+ const {fitScale}=logic().layout;
+ assert.equal(fitScale(1600,800,1600,4000),1,'long results scroll rather than become miniature');
+ assert.equal(fitScale(1400,600,1400,800,false),1);
+ for(const bad of [0,undefined,NaN,Infinity,-1])assert.equal(fitScale(1400,bad,1400,800),1);
+});
+
+test('viewport controller refits on resize/fullscreen and releases fitted height for long content',async()=>{
+ const x=boot(),stage=x.doc.getElementById('stage');
+ x.SM.app.go(3);
+ const slide=stage.querySelector('.slide'),frame=stage.querySelector('.slide-frame');
+ stage.clientWidth=1440;stage.clientHeight=740;
+ slide.offsetWidth=1400;slide.scrollHeight=840;
+ x.ctx.innerWidth=1536;x.ctx.getComputedStyle=()=>({paddingLeft:'20px',paddingRight:'20px',paddingTop:'20px',paddingBottom:'20px'});
+ x.ctx.requestAnimationFrame=fn=>fn();
+ const fit=x.SM.layout.create(stage,()=>true);fit.refresh();
+ assert.equal(frame.classes.has('is-fitted'),true);
+ assert.ok(parseFloat(frame.style.height)<=700);
+ assert.equal(stage.dataset.view,'fit');
+ stage.clientHeight=810;await x.fire('fullscreenchange',x.doc.body);
+ assert.ok(parseFloat(frame.style.height)<=770);
+ const larger=frame.style.height;
+ stage.clientHeight=700;await x.fire('resize',x.doc.body);
+ assert.ok(parseFloat(frame.style.height)<parseFloat(larger));
+ slide.scrollHeight=4000;fit.refresh();
+ assert.equal(slide.style.transform,'');assert.equal(frame.style.height,'');
+ assert.equal(stage.dataset.view,'scroll');
+ assert.ok(x.doc.getElementById('view-hint').textContent.includes('Scroll'));
+ x.ctx.innerWidth=600;slide.scrollHeight=840;fit.refresh();
+ assert.equal(slide.style.transform,'','mobile content stays full size');
+});
+
+test('fit preference survives reload without replacing earlier feedback',async()=>{
+ const x=boot();await x.click('next');await x.input('count-prediction-1',7,'change');
+ await x.click('fit');assert.equal(x.SM.app.state.ui.fit,false);
+ const y=boot({saved:x.memory.get(key),bundle:true});
+ assert.equal(y.SM.app.state.ui.fit,false);assert.equal(y.SM.app.state.polls.prediction.counts[1],7);
+ const legacy=plain(y.SM.app.state);delete legacy.ui.fit;
+ const z=boot({saved:JSON.stringify(legacy)});
+ assert.equal(z.SM.app.state.ui.fit,true);assert.equal(z.SM.app.state.polls.prediction.counts[1],7);
+});
+
+test('shell prevents outer-page overflow and keeps mobile and print content accessible',()=>{
+ const css=fs.readFileSync(path.join(root,'style.css'),'utf8');
+ assert.ok(css.includes('html,body{width:100%;height:100%;overflow:hidden}'));
+ assert.ok(css.includes('#shell{position:fixed;inset:0;'));
+ assert.ok(css.includes('grid-template-rows:76px minmax(0,1fr) 80px'));
+ assert.ok(css.includes('.rail .rail-word{display:none}'));
+ assert.ok(css.includes('html,body{height:auto;overflow:visible}'),'printing must not clip the report');
+ assert.ok(!css.includes('min-height:540px'));
+ assert.ok(!css.includes('#stage{overflow:visible'));
+});
+
+test('published entry boots without neighbouring assets and has an informative startup fallback',()=>{
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ assert.ok(html.includes('content="3.0.1"'));
+ assert.ok(html.includes('If this message remains, reload the page'));
+ const x=boot({bundle:true});
+ for(let i=0;i<15;i++){
+  x.SM.app.go(i);
+  assert.ok(x.doc.getElementById('stage').innerHTML.includes('id="slide-title"'));
+  assert.ok(!x.doc.getElementById('stage').innerHTML.includes('Starting the presentation'));
+ }
+});

@@ -15,7 +15,7 @@ SM.core = (() => {
   const emptyPoll = p => ({counts:p.options.map(()=>0),status:'not_started',revealed:false,reason:''});
   function create() {
     return {version:VERSION,session:{id:uid(),date:localDate(),label:'',size:null,createdAt:new Date().toISOString()},
-      ui:{slide:0,feedback:0,check:0,case:'loma',labAxis:'ground',ground:'soft',structure:'weak',labRevealed:false,liquidStep:0,motion:true,guide:false},
+      ui:{slide:0,feedback:0,check:0,case:'loma',labAxis:'ground',ground:'soft',structure:'weak',labRevealed:false,liquidStep:0,motion:true,guide:false,fit:true},
       polls:Object.fromEntries(C.polls.map(p=>[p.id,emptyPoll(p)])),
       council:{selected:[],reason:'',risk:'',equity:'',residents:false,before:[]},
       reflections:[],reflectionDraft:{text:'',kind:'learning',peerStrength:'',peerNext:'',criteria:[false,false,false]},
@@ -24,7 +24,7 @@ SM.core = (() => {
   function normalize(input) {
     const a = obj(input), d = create(), s = obj(a.session), u = obj(a.ui);
     d.session = {id:text(s.id,80)||d.session.id,date:validDate(s.date)?s.date:d.session.date,label:text(s.label,80),size:s.size === null || s.size === '' || s.size === undefined ? null : int(s.size,1),createdAt:iso(s.createdAt)||d.session.createdAt};
-    d.ui = {slide:int(u.slide,0,C.chapters.length-1),feedback:int(u.feedback,0,6),check:int(u.check,0,1),case:u.case==='christchurch'?'christchurch':'loma',labAxis:u.labAxis==='structure'?'structure':'ground',ground:['rock','soft','wet'].includes(u.ground)?u.ground:'soft',structure:u.structure==='designed'?'designed':'weak',labRevealed:u.labRevealed===true,liquidStep:int(u.liquidStep,0,2),motion:u.motion!==false,guide:u.guide===true};
+    d.ui = {slide:int(u.slide,0,C.chapters.length-1),feedback:int(u.feedback,0,6),check:int(u.check,0,1),case:u.case==='christchurch'?'christchurch':'loma',labAxis:u.labAxis==='structure'?'structure':'ground',ground:['rock','soft','wet'].includes(u.ground)?u.ground:'soft',structure:u.structure==='designed'?'designed':'weak',labRevealed:u.labRevealed===true,liquidStep:int(u.liquidStep,0,2),motion:u.motion!==false,guide:u.guide===true,fit:u.fit!==false};
     C.polls.forEach(p=>{
       const v=obj(obj(a.polls)[p.id]), supplied=Array.isArray(v.counts)?v.counts:[];
       const counts=p.options.map((_,i)=>int(supplied[i]));

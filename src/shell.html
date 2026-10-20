@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Seismic Mission 3.0: an interactive, one-computer classroom investigation of earthquake damage, with student reflection and faculty evaluation.">
+<meta name="theme-color" content="#0b1219">
+<title>Seismic Mission 3.0 — Same earthquake. Different stories.</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23d4f78b'/%3E%3Cpath d='M8 33h12l6-17 10 34 7-17h13' fill='none' stroke='%2314211a' stroke-width='5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#stage">Skip to presentation</a>
+<div id="shell">
+<header class="topbar">
+<div class="brand"><span class="brand-icon" aria-hidden="true">⌁</span><span>SEISMIC MISSION</span><span class="version">3.0.1 / CLASSROOM</span></div>
+<div class="toolbar"><span id="save-status" class="save-indicator" role="status">Local session</span><button type="button" data-action="menu" aria-label="Open chapter navigation">Chapters</button><button type="button" data-action="fit" id="fit-button" class="optional-tool" aria-pressed="true" title="Fit slides to the screen; long forms remain scrollable">Fit slide</button><button type="button" data-action="guide" id="guide-button" class="optional-tool" aria-pressed="false">Guide</button><button type="button" data-action="session" class="optional-tool">Session</button><button type="button" data-action="fullscreen" id="full-button" aria-label="Toggle fullscreen">Fullscreen</button></div>
+</header>
+<div class="workarea"><nav class="rail" id="chapter-rail" aria-label="Presentation chapters"></nav><main id="stage" tabindex="-1"><section class="startup panel" aria-label="Presentation loading"><h1>Seismic Mission 3.0</h1><p>Starting the presentation…</p><p>If this message remains, reload the page or open the latest complete offline file. Your saved classroom data is kept.</p><noscript>JavaScript is required for the interactive presentation. Enable it in this browser, then reload. No account is needed.</noscript></section></main></div>
+<footer class="bottom" id="bottom"><div class="progress-text"><span id="slide-count">01 / 15</span><span class="chapter-title" id="chapter-name"></span><span id="view-hint" class="view-hint"></span></div><div class="timer-box"><button type="button" data-action="timer-duration" title="Change discussion time: 30, 60 or 180 seconds">Discussion</button><output id="clock" aria-label="Discussion time remaining">1:00</output><button type="button" data-action="timer-toggle" id="timer-toggle">Start</button><button type="button" data-action="timer-reset" aria-label="Reset discussion timer">↺</button></div><div class="nav-actions"><button type="button" data-action="previous" id="previous">← Previous</button><button type="button" data-action="next" id="next" class="primary">Continue →</button></div></footer>
+</div>
+<div id="storage-warning" class="storage-warning" hidden><span id="storage-message"></span><button type="button" data-action="session">Session & data</button></div>
+<dialog id="dialog" aria-labelledby="dialog-title"><div class="dialog-header"><h2 id="dialog-title">Session</h2><button type="button" data-action="close-modal" aria-label="Close dialog">Close ✕</button></div><div id="dialog-body" class="dialog-body"></div></dialog>
+<div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+<div id="print-report" class="print-area"></div>
+<script src="content.js"></script>
+<script src="core.js"></script>
+<script src="visual.js"></script>
+<script src="research.js"></script>
+<script src="report.js"></script>
+<script src="pages.js"></script>
+<script src="layout.js"></script>
+<script src="app.js"></script>
+</body></html>

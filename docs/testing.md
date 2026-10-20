@@ -1,11 +1,11 @@
 # Verification record
 
-Version 3.0, checked in the development environment on 2026-10-20 UTC.
+Version 3.0.1, checked in the development environment on 2026-10-20 UTC.
 
 ## Completed checks
 
-- `node build-offline.mjs`: generated the standalone HTML from the current source modules.
-- `node test.mjs`: **30 tests passed, 0 failed**. Tests use Node’s test runner, pure state functions and a lightweight simulated DOM.
+- `node build-offline.mjs`: generated identical self-contained Pages (`index.html`) and offline files from `src/shell.html` and the current source modules.
+- `node test.mjs`: **36 tests passed, 0 failed**. Tests use Node’s test runner, pure state functions and a lightweight simulated DOM. The complete classroom-flow test now executes the scripts extracted from the actual published `index.html`, not only the source modules.
 - JavaScript syntax checks for the source files passed.
 - Parsed all 15 generated presentation sections, the faculty form and a blank report with an HTML parser. Checked duplicate IDs, label targets, form labels and SVG accessible names.
 - Rendered the hero, saturated-ground comparison and liquefaction SVGs as images for visual inspection. Corrected filled bracing paths, kept grain size constant between steps and checked diagram labels. This is diagram inspection, not a screenshot of the complete site.
@@ -25,12 +25,20 @@ Version 3.0, checked in the development environment on 2026-10-20 UTC.
 | Exports | Blob contents, filenames, JSON roundtrip, formula-safe CSV, complete report HTML | Native download dialogs and PDF pagination not exercised |
 | Invalid storage | Malformed JSON, incompatible schema, bounded nested values, blocked writes, previous-save recovery | Storage/browser eviction cannot be prevented |
 | Injection protection | Escaped hostile strings in report, forms, reflections and council; CSV formula guards | No external security audit |
-| 1920 × 1080 usability | Responsive CSS rules, minimum type sizes, scroll fallback, component structure | **Full-page visual browser verification pending** |
+| 1920 × 1080 usability | Fixed viewport shell; fit math for explicit projector/laptop/125% zoom geometry fixtures; simulated resize/fullscreen; readable long-content fallback | **Full-page visual browser verification pending** |
 | Offline operation | Generated inline scripts/styles match source; no runtime network API dependency; local-file paths | **Actual disconnected-browser run pending** |
-| GitHub Pages | Relative local paths, root `index.html`, `.nojekyll`, no server/build requirement | **No production deployment performed** |
+| GitHub Pages | Self-contained root `index.html`, identical offline bundle, `.nojekyll`, inline bundle boot and classroom flow | **No production deployment performed** |
 | Functional controls | Every rendered `data-action` resolves to a handler; representative full flow | Real-device acceptance still required |
 
 The automated lesson includes: class/date/size setup; initial prediction and reveal; lab controls; both case tabs; two knowledge checks with reasoning; a valid 10-credit budget; residents’ context; rubric feedback with skips; a peer-reviewed application sample; teacher scores/comments/review/confirmation; report creation; CSV, HTML and JSON exports; and restoring the saved state after reload. Additional tests cover failed storage, corruption recovery, deliberate reset, timer behavior and editing an unfinished reflection across reload.
+
+## 3.0.1 screenshot regression fixes
+
+- Inspected both user-supplied screenshots. The first showed a document scrollbar as well as the content scrollbar, with the top and bottom navigation displaced. The old rail combined 15 fixed-size buttons, large gaps and a long vertical label; it could exceed the content row and expand the document scroll area.
+- Constrained the shell to the viewport, allowed the middle grid row to shrink, removed the decorative rail label and contained overflow in each content pane. Made diagrams respond to viewport height and added measured slide fitting. Long data views are not reduced below 70%; they retain internal scrolling. Printing restores normal document overflow.
+- The second screenshot showed an empty stage and only partial styling. The precise network/cache response cannot be reconstructed from an image. GitHub's observed deployment history showed v3 branch commit `e6045d8` published at 01:36:57 UTC, followed by old `main` commit `b6bb1c6` at 01:40:07 UTC on 2026-10-20. Switching deployments is consistent with a mixed cached HTML/CSS/JS version, but that cause is not proven.
+- Replaced the split-file published entry with the same self-contained build used offline. A static startup message gives useful guidance if initialization fails instead of leaving a blank stage. The source remains modular.
+- Added six regression tests for fit bounds, readable overflow, resize/fullscreen recalculation, preference/old-session compatibility, viewport/print CSS contracts and booting the actual published bundle. Existing data and storage keys are preserved.
 
 ## Environment limitation
 
@@ -40,7 +48,7 @@ The Sites skill’s managed-preview instructions require the Browser plugin’s 
 
 On the actual presentation computer:
 
-1. Open `Seismic-Mission-offline.html` in the intended browser, disconnect the network, and navigate all 15 sections at 1920 × 1080. Check text size on the actual projector; scroll if necessary.
+1. Open `Seismic-Mission-offline.html` in the intended browser, disconnect the network, and navigate all 15 sections at 1920 × 1080. Check both bars remain visible at 100% and 125% browser zoom, with and without fullscreen. Visit the ground laboratory and reveal each mechanism; all slide content should fit. Long forms/results scroll in the centre without moving either bar. Check **Fit slide** off/on and projector readability.
 2. Test fullscreen, Tab/Shift+Tab within a dialog, Escape, arrow navigation from the slide title, and typing in fields without moving the presentation.
 3. Enter a few explicitly temporary tallies, correct one, complete it, reload and verify that it returns. Check reduced motion.
 4. Save a temporary peer sample and faculty evaluation, then edit the faculty comment and verify it becomes draft.
