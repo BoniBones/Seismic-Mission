@@ -1,0 +1,28 @@
+# Design and implementation comparison
+
+Reviewed before implementation: repository `BoniBones/Seismic-Mission` at `b6bb1c6`, and the actual HTML, tests, README and legacy files inside the supplied Claude ZIP. The ZIP's legacy application matches the repository's version 1. This review is based on source inspection; no browser screenshots of the old versions were available.
+
+| Dimension | Original ChatGPT version | Claude redesign | Decision for version 3 |
+|---|---|---|---|
+| Visual design | Atmospheric city SVGs, persistent sidebar, varied narrative layouts; bilingual UI adds projection clutter. | Consistent navy/amber palette and compact slide frame; small viewport-relative type, dense cards and generic bars. | One English exhibition design, large typography with a minimum size, labelled geological cross-sections, compact chapter navigation and scroll-safe layouts. |
+| Scientific accuracy | Explicit limitations, complete paper, qualitative cases, careful distinction between documentary research and experiment. | Some good definitions, but “Ground + building = damage”, a fixed shaking ranking and a universal-looking 2× claim overstate the model. | Preserve the paper and qualitative findings; replace deterministic claims and unsupported inspection-count charts with mechanism diagrams and evidence/interpretation/limits. |
+| Storytelling | A mystery, investigation, budget council, social consequences and debrief form a real narrative. | Eleven orderly sections, but loses the council and ethical discussion. | Restore the narrative and ethical application, with one continuous presenter-controlled sequence. |
+| Educational depth | Multiple causes, uncertainty, constrained decision-making and Laudato Si’. | Clear introductory explanations but often reduces assessment to recall. | Add controlled comparisons, reasoning before reveal and application to unfamiliar ground/building combinations. |
+| Engagement | Small-group discussion and a consequential class plan. | Frequent hand-raise questions, but eight feedback rounds can be repetitive. | A small number of core activities; quick, skippable reflection rounds and a short peer explanation protocol. |
+| Interactive activities | Ground/building controls and budget choices with residual risks; no fabricated damage probabilities. | Lab, three-choice challenge and adjustable vote counts. | Keep the controls and budget; collect actual votes before reveal, retain corrections and capture oral reasoning. |
+| Presenter usability | Saved progress, timer, modal focus management and presenter prompts. | Previous/next, keyboard shortcuts, fullscreen and slide dots. | Combine chapter jump, keyboard navigation, a pausable discussion timer, restore-on-reload and audience-safe guidance; protect inputs from global shortcuts. |
+| Student assessment | Written reasoning and a suggested facilitator rubric, but no student feedback dataset. | Five self-report dimensions, concept tallies and notes; challenge answers live in transient `cs` state and are absent from reports. | Persist and export knowledge checks separately from self-report, retain sample sizes/status/abstentions and add peer feedback on an actual explanation. |
+| Teacher evaluation | No integrated faculty rubric. | Seven criteria, comments, review/confirmation and export; can confirm an empty rubric, lacks modal focus management, partial averages are prominent. | Seven criterion-specific scales, explicit “not observed”, required review and confirmation, edit invalidation, no blended score, printable draft status. |
+| Reliability / maintainability | Modular JS, storage feedback, safe text rendering, unit tests; no integrated evaluation schema. | Single compressed HTML; validation is shallow, storage errors are silent, no backup restore, missing challenge persistence. | Modular dependency-free JS with a validated versioned schema, recoverable corruption, storage-failure notice, JSON backup/restore, formula-safe CSV and standalone offline build. |
+
+## Retained, redesigned and replaced
+
+- From v1: research text, documentary method, multi-causal caveats, concept laboratory, budget options (5/4/4/2 credits), remaining-risk reasoning, resident participation and Laudato Si’ §§150–152, 158.
+- From v2: presenter-entered hand tallies, five reflection dimensions, seven faculty criteria, review/confirm workflow, downloadable CSV/JSON and print reporting.
+- Redesigned: the lab becomes an explicitly qualitative comparison with a fixed reference and one changed factor; case files separate observations from inferences; the challenge records outcomes and reasoning; the feedback flow distinguishes survey claims from knowledge evidence.
+- Replaced: automatic correctness claims about a whole class, average-of-everything metrics, unsupported-looking damage graphics, unlabeled incomplete tallies, silent save failures and unsafe reset-by-reload.
+- Both previous applications remain under `legacy/v1/` and `legacy/v2/`. They are historical snapshots, not the recommended classroom entry points.
+
+## Science editorial policy
+
+The original paper is the authoritative project source and remains unaltered in `research.js` and `docs/original-research.md`. The classroom layer retains its question, hypothesis, methods, case evidence and conclusion. External primary sources check definitions and specific facts. Numerical amplification, home-count and building-inspection figures without sufficient scope in the supplied bibliography are preserved in the original paper but not promoted as general facts or turned into damage-rate charts. The original bibliography contains a mismatched NZHistory label pointing to a USGS URL; the live source list labels its actual destination. See `science-notes.md`.

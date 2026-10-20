@@ -1,84 +1,128 @@
-# Seismic Mission
+# Seismic Mission 3.0
 
-Experiencia interactiva para una clase de 3.er año (14–15 años), basada en la investigación **Why Do Earthquakes Damage Some Places More Than Others?**
+**Why Do Earthquakes Damage Some Places More Than Others?**
 
-## Abrir y usar
+An English-language, presenter-controlled science exhibition for students aged 15–16. One computer and one projector run the entire lesson. Students predict, discuss, raise hands, explain and give peer feedback. No accounts, phones, QR codes or external services are required.
 
-- **Sin instalación ni internet:** descargá **Seismic-Mission-offline.html** y abrilo en Chrome, Edge o Firefox. Es un único archivo con todos los recursos.
-- **Como sitio web:** serví esta carpeta con cualquier alojamiento estático. El punto de entrada es **index.html** y sus rutas son relativas, por lo que funciona en una subcarpeta de GitHub Pages.
-- Para publicar: Settings → Pages → Deploy from a branch → main → /(root) → Save.
-- Una vez publicado, compartí https://BoniBones.github.io/Seismic-Mission/ . Copiar el código al repositorio no activa Pages automáticamente.
+## Open it now
 
-No requiere npm, cuentas, claves, servicios externos ni conexión para las actividades. Los enlaces de fuentes sí necesitan internet. Abrir un archivo HTML en la vista de código de GitHub no ejecuta la experiencia: hay que descargarlo o alojarlo.
+1. Download the project ZIP from the version 3 branch or pull request and extract it.
+2. Double-click **`Seismic-Mission-offline.html`** in Chrome, Edge or Firefox. This is the recommended classroom file; it contains the whole application and original research.
+3. Open **Session**. Set the presentation date, optional class label and optional number of students.
+4. Use **Fullscreen**, then **Begin the investigation**. Run the discussion with students speaking and raising hands; the presenter controls everything.
 
-## Recorrido de 25–35 minutos
+No installation or internet connection is needed. In release **3.0.1**, both `index.html` and `Seismic-Mission-offline.html` contain the complete application, styles and research; either file can be opened on its own. Source bibliography links need internet; they are not required to teach the lesson.
 
-1. **La llamada:** misterio que conecta con lugares del barrio.
-2. **Tu apuesta:** votación a mano alzada y predicciones justificadas.
-3. **El laboratorio:** terreno y estructura modificables con animación conceptual.
-4. **Los expedientes:** Loma Prieta 1989, Christchurch 2011, metodología y límites.
-5. **El consejo:** equipos asignan 10 créditos entre escuela, viviendas, cimientos y preparación.
-6. **La decisión humana:** nueva información y aplicación de Laudato Si’ a vivienda y dignidad.
-7. **El informe:** riesgos pendientes, defensa oral e informe descargable.
+**Before presenting:** open the file on the actual presentation computer, check fullscreen/projector readability, make a test tally and export a backup. Start a new empty class afterwards. Real-browser/projector QA was unavailable in the development environment; see [testing.md](docs/testing.md) for the exact verification boundary.
 
-La persona que presenta opera una pantalla compartida. Cada equipo piensa en papel. La web registra un plan del curso, no votos sincronizados ni múltiples equipos en línea.
+## Run the lesson
 
-## Para generar participación
+| Chapters | Purpose | Approximate time |
+|---|---|---:|
+| 1–2: Briefing and prediction | Compare fictional neighbourhoods; record a prediction and reason | 3 min |
+| 3–4: Source to site; ground laboratory | Distinguish magnitude/intensity and change one assumption at a time | 5 min |
+| 5–7: Liquefaction, cases, connections | Explain mechanisms; examine Loma Prieta and Christchurch | 8 min |
+| 8: Earthquake investigator | Two knowledge checks with tallies, reasons and answer reveals | 3 min |
+| 9–10: Council and fairness | Allocate 10 fictional credits; consider residents and residual risk | 5 min |
+| 11–12: Class pulse and peer reflection | Five short rubric rounds, new concepts, spoken explanation and peer feedback | 3–5 min |
+| 13: Faculty review | Teacher scores/reviews/confirms on the same computer | 3–5 min; can return later |
+| 14–15: Learning evidence and debrief | Review results, export and answer the original question | 2 min |
 
-- Activá **Modo docente** para ver tiempos y preguntas específicas.
-- Pedí primero opiniones, después evidencia, y recién al final una revisión de la opinión.
-- Elegí estudiantes como operadores del laboratorio y representantes de los vecinos.
-- Distribuí roles de presupuesto, ciencia y comunidad. Evitá premiar sólo a quien habla más.
-- Escuchá dos planes distintos. Preguntá qué problema resuelve cada uno y qué problema deja.
-- El cierre compara “lo que pensábamos” con “lo que ahora podemos justificar”.
-- No pidas testimonios personales de desastres ni uses la actividad para generar miedo.
+The teacher review can be skipped during the lesson and completed later. Any activity or question can be skipped without breaking navigation. Use **Chapters** to return to an activity; entered data stays saved. Keep **Guide** off for the cleanest projection; its optional prompts are deliberately suitable for the audience.
 
-## Funciones
+### Presenter controls
 
-- Español / inglés.
-- Modo docente con guía en ambas lenguas.
-- Navegación por estaciones, teclado y pantalla completa.
-- Laboratorio visual con tres suelos y dos tipos de estructura.
-- Presupuesto que bloquea elecciones superiores a 10 créditos.
-- Temporizador opcional, pausado al volver a abrir la página.
-- Progreso en localStorage del navegador. No se envían datos a un servidor.
-- Texto de investigación completo y enlaces a las fuentes.
-- Informe TXT que incluye decisiones, razones y riesgos pendientes.
-- Diseño adaptable a pantallas pequeñas y preferencia de movimiento reducido.
+- Next/previous: buttons, **→ / ←**, **Page Down / Page Up**, or **Space** to advance.
+- **Home / End**: first/final chapter. **M**: chapter menu. **G**: discussion guide.
+- **F**: fullscreen; **E**: faculty rubric; **Escape**: close a dialog.
+- Keyboard shortcuts do not interrupt inputs, links, buttons or dialogs.
+- The discussion timer cycles between 30, 60 and 180 seconds. Start/pause/reset it explicitly. It pauses when navigating or opening a dialog and never advances a section automatically.
+- Motion is restrained and can be disabled in Session. System reduced-motion preferences are respected. Every mechanism also has a text explanation.
+- **Fit slide** (on by default) scales a slide to the available content area when needed. It recalculates after reveals, window resizing and fullscreen changes. Turn it off for full-size text. The header/footer stay inside the viewport. Long forms and results remain readable and scroll only inside the content area; “Scroll content ↓” indicates this. Mobile layouts use full-size scrolling content. No evaluation data is changed by fitting.
 
-**Nueva clase** solicita confirmación antes de borrar el progreso local. En navegadores que bloquean localStorage la experiencia sigue funcionando, pero el progreso puede perderse al cerrar.
+## Participation and honest assessment
 
-## Ciencia y fuentes
+### Voting
 
-La ciudad, los costos, el mensaje de los vecinos y las animaciones son recursos didácticos. No calculan intensidad, probabilidades, daños ni vidas salvadas. Las intervenciones reales requieren evaluación técnica.
+Tell students to choose **one option per question**, raise their hand only for that option, and lower it before the next option. Voting is visible and **not anonymous**. Enter counts directly or use `+` / `−`; no student types answers.
 
-Los expedientes distinguen magnitud de intensidad, amplificación de licuefacción y vulnerabilidad estructural de problemas del terreno. Los estudios documentales apoyan la hipótesis, pero no aíslan todas las variables.
+Use **Complete tally** when counting is finished, then **Reveal explanation** on prediction/knowledge questions. Record a short class reason before revealing when possible. Skipping unlocks a demonstration without pretending votes were collected. Correcting a completed tally returns it to “in progress”; complete it again after correction. Clearing one tally requires a separate confirmation.
 
-La aplicación de Laudato Si’ se refiere a planificación participativa y dignidad de la vivienda (§§150–152), y al cuidado de los más pobres (§158). No atribuye terremotos tectónicos a contaminación.
+Class size, if entered, prevents incremental overcounting. An incomplete tally can still be completed, but its sample size and unrecorded count remain explicit. Draft or skipped tallies are excluded from summary metrics. “Not sure / pass” is included in knowledge-check denominators. For rubric questions, pass is not a fifth rating level.
 
-Fuentes principales:
+### Peer feedback and reflection
 
-- [USGS: Loma Prieta](https://www.usgs.gov/programs/earthquake-hazards/science/m-69-october-17-1989-loma-prieta-earthquake)
-- [NIST: investigación de Loma Prieta](https://www.nist.gov/el/earthquake-loma-prieta-california-1989)
-- [AIDR: Christchurch](https://knowledge.aidr.org.au/resources/earthquake-christchurch-new-zealand-2011/)
-- [USGS: magnitud e intensidad](https://www.usgs.gov/faqs/what-difference-between-earthquake-magnitude-and-earthquake-intensity-what-modified-mercalli)
-- [Francisco: Laudato Si’](https://www.vatican.va/content/francesco/en/encyclicals/documents/papa-francesco_20150524_enciclica-laudato-si.html)
+Five 1–4 dimensions cover understanding, explaining a concept, connecting to real situations, confidence applying knowledge, and clarity/engagement. Each level has a short descriptor. These are **perceptions**, not test scores.
 
-El documento original en **research.js** se conserva como borrador. Sus cifras detalladas y ciertas inconsistencias bibliográficas necesitan revisión antes de una entrega académica. El recorrido principal no depende de esas cifras.
+The required prompt is: **“What is one thing you learned today that you did not know before?”** Hear two or three responses. A partner identifies one scientific strength and one improvement. The presenter records brief paraphrases without student names.
 
-## Archivos y verificación
+Also collect an application explanation comparing two ground conditions. The presenter may mark whether the spoken sample included a ground mechanism, structural factor and uncertainty. Up to six samples can be saved, edited and removed. These are qualitative samples, not an individual grade or evidence of whole-class mastery.
 
-- **content.js:** contenido, fuentes y consignas.
-- **app.js:** estado, presupuesto, temporizador, diálogos y descarga.
-- **visual.js:** ilustración SVG y modelo conceptual.
-- **pages.js:** las siete estaciones.
-- **research.js:** texto completo en inglés.
-- **style.css:** diseño, impresión y adaptación.
-- **Seismic-Mission-offline.html:** copia autosuficiente generada a partir de los archivos anteriores.
+### Faculty evaluation
 
-Ejecutá **node test.mjs** para comprobar las pantallas en ambos idiomas, el presupuesto, los riesgos, el tratamiento de entradas como texto, el temporizador, errores de almacenamiento y la inclusión de recursos sin conexión.
+Seven criterion-specific 1–4 scales cover accuracy, clarity, engagement, value, structure, interactive activities, and visual/technical quality. **Not observed** is available for each criterion. Optional fields: overall score, strengths, improvements, comments and name.
 
-Las pruebas usan un entorno DOM mínimo para verificar lógica y generación de contenido; no sustituyen una revisión visual en navegador. La revisión visual no pudo realizarse en el entorno de creación por indisponibilidad del navegador y bloqueo de la vista previa local.
+The teacher can operate the computer or dictate. Address every criterion, select **Review before confirming**, then **Confirm evaluation**. Editing any answer returns the evaluation to draft and requires a new review. Confirmation is not a verified identity or signature. No aggregate average is inferred.
 
+## Evidence reports, backup and privacy
 
-Tras editar el contenido, regenerá la copia sin conexión con **node build-offline.mjs** y ejecutá **node test.mjs**.
+From **Learning evidence** or **Review / print report**:
+
+- **Print / Save as PDF:** prints the complete evidence report, regardless of the currently visible chapter. Select Save as PDF in the browser print dialog. The report uses A4 print CSS; no PDF library or online converter is required.
+- **Printable HTML:** downloads a self-contained report you can open offline and print later.
+- **CSV:** includes session details, every question’s status and sample size, votes, class reasoning, peer reflections, budget reasoning, faculty scores and comments. Formula-leading text is neutralised for spreadsheet import.
+- **JSON backup:** includes restorable session state plus a readable evidence object. Import it through **Session → Restore**, review the candidate and confirm replacement.
+
+The dashboard starts empty and reports only entered information. Knowledge answers and self-reports remain separate. There is no pooled participation percentage, made-up reflection, average across different questions, learning-gain estimate, fabricated teacher opinion or signature.
+
+All session data is stored in this browser under `seismic-mission-v3`; a previous valid save is kept under `seismic-mission-v3-previous`. No analytics, API calls, automatic uploads or student identifiers are used. A storage failure is shown visibly, and work stays in memory so it can be exported. Corrupted or incompatible storage is left untouched until recovery or an explicit reset. An update from another tab pauses saving to avoid overwriting it.
+
+Browser local storage may be cleared or behave differently for local `file:` URLs, private browsing or a moved file. **Download a JSON backup before closing, moving the file or changing computers.** To start another class, type `CLEAR` in the dedicated reset dialog. This clears version 3 data and its recovery save, not other applications or legacy versions.
+
+## Publish with GitHub Pages
+
+This is a static site with a self-contained root `index.html` and `.nojekyll`; no framework, package installation, server, secret, build service or database is needed. All critical CSS/JavaScript is inline, so an older cached asset or a copied HTML file cannot load an incompatible mix of v1 and v3 modules.
+
+The version 3 work is delivered on a dedicated branch and pull request. **Main is not changed or deployed automatically.** After reviewing and merging the PR yourself:
+
+1. In GitHub, open the repository’s **Settings → Pages**.
+2. Choose **Deploy from a branch**.
+3. Select `main` and `/(root)`, then save.
+4. Use the Pages URL shown by GitHub after its deployment completes. For the existing repository, the expected project path is `https://BoniBones.github.io/Seismic-Mission/`; check GitHub’s displayed status before sharing it.
+
+To try version 3 on Pages **before merging**, choose `codex/seismic-mission-3-0` and `/(root)` instead of `main` in Settings → Pages. The selected publishing branch determines the live version; updating a PR does not update a site that still publishes from `main`. Wait for the Pages build and deployment run to succeed.
+
+If the page shows an empty stage or mismatched bars, first check the published branch and deployment commit, then reload with **Ctrl+Shift+R** (macOS: **Cmd+Shift+R**). The header for this fix reads **3.0.1 / CLASSROOM**. The old split-file version could mix a cached shell with assets from a different deployment. The new single-document build removes that asset mismatch, but an entirely cached older page still needs reloading.
+
+A branch ZIP is source code, not a deployed website. For classroom reliability, keep the standalone HTML locally even when using a hosted version. The hosted page does not install a service worker: a first visit without network is not supported. Offline use is provided by the downloaded standalone file (or the complete local project).
+
+## Maintain the project
+
+Runtime dependencies: **none**. For development checks, Node.js 18 or newer is sufficient.
+
+```sh
+node build-offline.mjs
+node test.mjs
+# Equivalent commands:
+npm run build
+npm test
+```
+
+Run the builder after editing source files. It reads `src/shell.html` and embeds the CSS, modules and full original research into **both** `index.html` and `Seismic-Mission-offline.html`. Commit both generated files. Do not edit the generated HTML directly: the next build replaces it. Tests check that both files are identical and match the sources, and execute the inline published bundle through the simulated classroom flow.
+
+| File | Responsibility |
+|---|---|
+| `content.js` | Chapters, poll questions, teacher descriptors, sources and fictional budget options |
+| `core.js` | Versioned state validation, vote rules, evidence model, CSV and JSON backup logic |
+| `visual.js` | Accessible, labelled SVG mechanism diagrams |
+| `pages.js` | Presentation and form rendering; user text is escaped |
+| `src/shell.html` | Editable application shell; the builder generates the deployable HTML |
+| `layout.js` | Available-space measurement, slide fitting, resize/fullscreen recovery |
+| `app.js` | Navigation, local persistence, input handling, timer, dialogs and downloads |
+| `report.js` | Complete screen/HTML/print report generated from the evidence model |
+| `research.js` | Unaltered original project paper |
+| `style.css` | Design system, responsive layouts, reduced motion and print rules |
+| `tests/` | Pure logic and simulated-DOM classroom-flow tests |
+| `legacy/v1/`, `legacy/v2/` | Preserved previous implementations for reference |
+
+See [comparison.md](docs/comparison.md) for the 10-dimension review and retained/redesigned features, [science-notes.md](docs/science-notes.md) for source decisions, and [testing.md](docs/testing.md) for what was and was not verified.
