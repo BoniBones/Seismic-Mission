@@ -1,48 +1,328 @@
-/* Presentation views. User-entered content must pass through esc(). */
 'use strict';
-SM.views = (() => {
-  const C=SM.content,K=SM.core,V=SM.visual,e=K.esc;
-  const b=(label,action,extra='',cls='')=>{
-    const suffix=[...extra.matchAll(/data-(?:id|value|index|delta)="([^"]*)"/g)].map(m=>m[1].replace(/[^a-zA-Z0-9_-]/g,'')).join('-');
-    const id=/(?:^|\s)id=/.test(extra)?'':`id="action-${action}${suffix?'-'+suffix:''}"`;
-    return `<button type="button" ${id} data-action="${action}" ${extra} class="${cls}">${label}</button>`;
-  };
-  const head=(n,title,lead='')=>`<div class="eyebrow"><span class="rule"></span>${String(n+1).padStart(2,'0')} / ${C.chapters[n][1]} <span class="muted">· ${C.chapters[n][2]}</span></div><h2 id="slide-title" tabindex="-1">${title}</h2>${lead?`<p class="lede">${lead}</p>`:''}`;
-  const sources=(...ids)=>`<div class="source-line">Evidence: ${ids.map(id=>C.sources.find(x=>x.id===id)?.title||id).join(' · ')} ${b('View sources ↗','sources')}</div>`;
-  const field=(label,path,value,options='')=>`<label class="label" for="${path}">${label}</label><textarea id="${path}" data-field="${path}" ${options.includes('maxlength=')?'':'maxlength="1200"'} ${options}>${e(value)}</textarea>`;
-  const status=v=>`<span class="status-label ${v}">${v==='not_started'?'not started':v==='draft'?'in progress':v}</span>`;
-  function poll(s,id){
-    const p=C.polls.find(x=>x.id===id),v=s.polls[id],st=K.pollStats(s,id),denom=st.n||1;
-    return `<div class="poll" data-poll="${id}"><p class="poll-title">${p.title}</p><div class="poll-meta">${status(v.status)}<span>${p.kind==='rubric'?'Self-reported perception · not a knowledge score':p.kind==='knowledge'?'Knowledge check · class tally':p.kind==='prediction'?'Opening prediction · not a class grade':'Student feedback'}</span></div>${p.options.map((o,i)=>`<div class="tally ${v.revealed&&i===p.answer?'correct':''}"><span class="option-label"><span class="option-letter">${p.kind==='rubric'&&i<4?i+1:String.fromCharCode(65+i)}</span><span>${e(o)}${v.revealed&&i===p.answer?' <strong class="accent">✓</strong>':''}</span></span><div class="track" aria-hidden="true"><span style="width:${v.counts[i]/denom*100}%"></span></div><div class="count-control">${b('−','vote',`id="minus-${id}-${i}" data-id="${id}" data-index="${i}" data-delta="-1" aria-label="Remove one vote: ${e(o)}" ${v.counts[i]===0?'disabled':''}`)}<input id="count-${id}-${i}" data-count="${id}" data-index="${i}" type="number" min="0" max="500" step="1" inputmode="numeric" value="${v.counts[i]}" aria-label="Vote count: ${e(o)}">${b('+','vote',`id="plus-${id}-${i}" data-id="${id}" data-index="${i}" data-delta="1" aria-label="Add one vote: ${e(o)}"`)}</div></div>`).join('')}
-    <p class="tally-note">${st.n} hands recorded${s.session.size!==null?` / ${s.session.size} students · ${st.missing} unrecorded`:' · class size not entered'}. One choice per student; count each hand once. This is a visible show of hands, not anonymous.${st.invalid?' <strong class="amber">Tally exceeds class size; excluded from summary.</strong>':''}${v.status==='draft'?' Complete the tally to include it in the summary.':''}${v.status==='skipped'?' Saved draft counts are excluded from summary metrics.':''}${v.revealed?' The explanation is visible; later edits are corrections, not a fresh independent attempt.':''}</p>
-    <div class="actions poll-actions">${b(v.status==='completed'?'Tally completed ✓':'Complete tally','complete-poll',`data-id="${id}"`,'primary')}${p.answer!==undefined?b(v.revealed?'Hide explanation':'Reveal explanation','reveal-poll',`data-id="${id}" ${!['completed','skipped'].includes(v.status)?'disabled':''}`):''}${b('Skip question','skip-poll',`data-id="${id}"`,'ghost')}${b('Clear tally','clear-poll',`data-id="${id}"`,'ghost')}</div>
-    ${p.answer!==undefined?`<label class="reason-field" for="reason-${id}">Record a brief class reason before revealing (optional)<textarea id="reason-${id}" data-poll-reason="${id}" maxlength="600" rows="2" placeholder="We think… because…">${e(v.reason)}</textarea></label>`:''}
-    ${v.revealed?`<div class="answer" role="status"><b>${p.kind==='prediction'?'A defensible prediction':'Explanation'}</b>${p.explanation}</div>`:''}</div>`;
+
+function renderItemList(items, emptyEs, emptyEn) {
+  if (!items.length) return '<p class="sr-empty">' + tr(emptyEs, emptyEn) + '</p>';
+  return '<ul class="sr-mini-list">' + items.map(item => '<li><strong>' + tr('Opción ', 'Option ') + item.id + ':</strong> ' + esc(t(item.title)) + '</li>').join('') + '</ul>';
+}
+
+const pages = [
+  function intro() {
+    return box('hero', '<div>' + box('eyebrow', tr('Un misterio bajo tus pies', 'A mystery beneath your feet')) + '<h1 tabindex="-1" id="pageTitle">' + tr('La misma sacudida.<br><em>Distintas historias.</em>', 'The same earthquake.<br><em>Different stories.</em>') + '</h1>' + p(tr('Tu escuela sigue en pie. A unas cuadras, las casas se hundieron. ¿Qué cambió? Hoy el curso es el equipo que tiene que investigarlo.', 'Your school is still standing. A few streets away, homes have sunk. What changed? Today your class is the team investigating why.'), 'lede') + box('actions', btn(tr('Entrar a la misión', 'Enter the mission') + ' →', 'go(1)', 'primary')) + p(tr('Escenario inicial ficticio · evidencia real', 'Fictional opening · real evidence'), 'small') + '</div><div>' + city() + p(tr('No necesitás saber geología. Necesitás observar, discutir y justificar.', 'You do not need to know geology. You need to observe, discuss and explain.'), 'small') + '</div>');
+  },
+  function prediction() {
+    return head(tr('01 / Pensar antes de saber', '01 / Predict before you know'), tr('¿Dónde vivirías vos?', 'Where would you live?'), tr('Mismo terremoto. Distancia parecida a la falla. Dos barrios. Conversalo con quien tenés al lado durante 30 segundos.', 'Same earthquake. Similar fault distance. Two neighbourhoods. Discuss with the person next to you for 30 seconds.')) + box('split', box('flat', box('tag', 'A / ' + tr('RIBERA', 'RIVERSIDE')) + h(tr('Arena húmeda + ladrillo sin refuerzo', 'Wet sand + unreinforced brick')) + p(tr('Casas antiguas sobre arena suelta saturada. Conexiones débiles entre paredes y techos.', 'Older homes on loose saturated sand. Weak connections between walls and roofs.'))) + box('flat', box('tag', 'B / ' + tr('COLINA', 'HILLTOP')) + h(tr('Roca firme + diseño sísmico', 'Firm rock + seismic design')) + p(tr('Edificios con conexiones y refuerzos diseñados para resistir fuerzas sísmicas.', 'Buildings with connections and reinforcement designed to resist seismic forces.')))) + box('poll', [['a', tr('A · Me quedo en Ribera', 'A · Riverside')], ['b', tr('B · Elijo Colina', 'B · Hilltop')], ['c', tr('C · Quiero más datos', 'C · I need more evidence')]].map(([id, label]) => btn(label, "vote('" + id + "')", state.vote === id ? 'chosen' : '')).join('')) + (state.vote ? box('answer', tr('Registrado. Colina suele ser menos vulnerable bajo estas condiciones. Pero ninguna combinación garantiza seguridad: también importan intensidad local, profundidad, distancia y detalles de cada edificio.', 'Recorded. Hilltop is generally less vulnerable under these conditions. But no combination guarantees safety: local intensity, depth, distance and individual building details also matter.')) : '');
+  },
+  function laboratory() {
+    return head(tr('02 / Laboratorio de ideas', '02 / Idea laboratory'), tr('El suelo también participa', 'The ground matters too'), tr('Cambiá una condición por vez. Antes de activar el modelo, predecí qué problema aparecerá.', 'Change one condition at a time. Before running the model, predict what problem might appear.')) + box('split', '<div><div id="labScene">' + city(state.soil, state.design) + '</div>' + p(tr('Animación conceptual. No calcula intensidad, daños ni probabilidades reales. Desplazamientos exagerados para explicar el mecanismo.', 'Conceptual animation. It does not calculate real intensity, damage or probabilities. Movement is exaggerated to explain the mechanism.'), 'small') + '</div><div>' + box('control', '<label for="soil">' + tr('Terreno', 'Ground') + '</label><select id="soil"><option value="rock">' + tr('Roca firme', 'Firm rock') + '</option><option value="soft">' + tr('Suelo blando', 'Soft soil') + '</option><option value="wet">' + tr('Arena suelta saturada', 'Loose saturated sand') + '</option></select>') + box('control', '<label for="design">' + tr('Estructura', 'Structure') + '</label><select id="design"><option value="good">' + tr('Diseño y conexiones sísmicas', 'Seismic design and connections') + '</option><option value="weak">' + tr('Mampostería sin refuerzo', 'Unreinforced masonry') + '</option></select>') + '<button type="button" class="primary" id="run">' + tr('Activar modelo', 'Run model') + '</button><div id="labResult" aria-live="polite"></div></div>') + MISSION.science.slice(0, 3).map(x => detail(t(x.title), t(x.text))).join('');
+  },
+  function cases() {
+    const item = MISSION.cases[state.case], l = state.case === 'loma';
+    return head(tr('03 / Evidencia real', '03 / Real evidence'), tr('Dos ciudades. La misma pregunta.', 'Two cities. The same question.')) + box('tabs', btn('Loma Prieta · 1989', "setCase('loma')", l ? 'selected' : '') + btn('Christchurch · 2011', "setCase('christchurch')", !l ? 'selected' : '')) + box('split', '<div>' + box('big accent', item.year) + p(item.date, 'tag') + h(t(item.title)) + p(t(item.intro), 'lede') + '</div>' + box('panel', box('tag', tr('PISTA CENTRAL', 'KEY CLUE')) + p(t(item.clue), 'quote') + '<a target="_blank" rel="noopener" href="' + MISSION.sources[item.source][1] + '">' + tr('Abrir fuente original', 'Open original source') + ' ↗</a>')) + box('evidence', [['ground', tr('Terreno', 'Ground')], ['buildings', tr('Construcción', 'Construction')], ['limits', tr('Otras variables', 'Other variables')]].map(([key, label]) => '<article>' + h(label) + p(t(item[key])) + '</article>').join('')) + detail(t(MISSION.science[3].title), t(MISSION.science[3].text)) + box('actions', btn(tr('Leer la investigación completa', 'Read the complete research'), 'openPaper()')) + p(tr('Texto original en inglés, con el desarrollo completo y su bibliografía.', 'Original English text, including the full argument and bibliography.'), 'small');
+  },
+  function decisionSlide() {
+    const session = state.survival;
+    const cfg = MISSION.survivalConfig;
+    const count = session.selectedIds.length;
+    const locked = isDecisionLocked(session);
+    const canEval = canEvaluatePlan(session);
+    const meta = getTimerVisualMeta(session);
+    const startLabel = session.timerStatus === 'paused' ? tr('Reanudar', 'Resume') : tr('Iniciar', 'Start');
+    const disableStart = session.timerStatus === 'running' || locked || session.remainingMs <= 0;
+    const disablePause = session.timerStatus !== 'running';
+
+    const consignaBlock =
+      '<div class="sr-consigna panel">' +
+        '<div class="sr-consigna-main">' +
+          '<p class="sr-directive">' +
+            tr(
+              '«Cinco medidas propuestas. Dos son trampas técnicas o mitos ineficaces. Seleccionen las dos opciones que deben <strong>DESCARTARSE</strong> antes de que el tiempo expire».',
+              '“Five proposed measures. Two are technical traps or ineffective myths. Select the two options that must be <strong>DISCARDED</strong> before time expires.”'
+            ) +
+          '</p>' +
+          '<div class="sr-req-row">' +
+            '<span class="sr-req-pill">' + tr('Seleccionar exactamente 2 opciones para descartar', 'Select exactly 2 options to discard') + '</span>' +
+            '<span class="sr-counter ' + (count === cfg.maxDiscards ? 'is-complete' : '') + '" id="srDiscardCounter" aria-live="polite">' +
+              tr('Descartes: ', 'Discards: ') + count + '/' + cfg.maxDiscards +
+            '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    const timerBlock =
+      '<div class="sr-timer panel ' + meta.stateClass + '" id="srTimerBox">' +
+        '<div class="sr-timer-top">' +
+          '<div class="sr-clock-wrap">' +
+            '<span class="sr-clock" id="srClock">' + formatSurvivalClock(session.remainingSeconds) + '</span>' +
+            '<span class="sr-timer-status" id="srTimerStatus" aria-live="polite">' + meta.statusText + '</span>' +
+          '</div>' +
+          '<div class="sr-timer-controls">' +
+            btn(startLabel, 'timerStart()', 'sr-btn-start', 'id="srStartBtn"' + (disableStart ? ' disabled' : '')) +
+            btn(tr('Pausar', 'Pause'), 'timerPause()', '', 'id="srPauseBtn"' + (disablePause ? ' disabled' : '')) +
+            btn('Reset', 'timerReset()', '', 'id="srResetBtn"') +
+            btn(
+              tr('Evaluar Plan Sísmico', 'Evaluate Seismic Plan'),
+              'confirmEvaluation()',
+              'primary sr-eval-btn',
+              'id="srEvaluateBtn"' + (!canEval ? ' disabled' : '')
+            ) +
+          '</div>' +
+        '</div>' +
+        '<div class="sr-timer-track" id="srTimerTrack" role="progressbar" aria-label="' + tr('Tiempo restante', 'Remaining time') + '" aria-valuemin="0" aria-valuemax="' + cfg.timerDurationSeconds + '" aria-valuenow="' + session.remainingSeconds + '">' +
+          '<div class="sr-timer-fill" id="srTimerBar" style="width:' + meta.pct.toFixed(1) + '%"></div>' +
+        '</div>' +
+      '</div>';
+
+    const cardsHtml = MISSION.options.map(opt => {
+      const isDiscarded = session.selectedIds.includes(opt.id);
+      const isMaxedOut = !locked && !isDiscarded && count >= cfg.maxDiscards;
+      const cls = [
+        'sr-card',
+        isDiscarded ? 'is-discarded' : 'is-retained',
+        locked ? 'is-locked' : '',
+        isMaxedOut ? 'is-maxed' : ''
+      ].filter(Boolean).join(' ');
+
+      let badgeHtml;
+      if (isDiscarded) {
+        badgeHtml = '<span class="sr-card-badge is-discarded">✕ ' + tr('DESCARTADA', 'DISCARDED') + '</span>';
+      } else if (locked) {
+        badgeHtml = '<span class="sr-card-badge is-locked">' + tr('BLOQUEADA', 'LOCKED') + '</span>';
+      } else if (isMaxedOut) {
+        badgeHtml = '<span class="sr-card-badge is-muted">' + tr('CUPO 2/2', 'LIMIT 2/2') + '</span>';
+      } else {
+        badgeHtml = '<span class="sr-card-badge is-active">' + tr('EN PLAN', 'IN PLAN') + '</span>';
+      }
+
+      const attrs = [
+        'id="srCard-' + opt.id + '"',
+        'aria-pressed="' + String(isDiscarded) + '"',
+        locked ? 'disabled' : (isMaxedOut ? 'aria-disabled="true"' : '')
+      ].filter(Boolean).join(' ');
+
+      return (
+        '<button type="button" class="' + cls + '" ' + attrs + ' onclick="toggleDiscard(' + opt.id + ',event.detail===0)">' +
+          '<div class="sr-card-head">' +
+            '<span class="sr-keycap" aria-hidden="true">' + opt.id + '</span>' +
+            '<strong class="sr-card-title">' + tr('Opción ', 'Option ') + opt.id + ' — ' + esc(t(opt.title)) + '</strong>' +
+            badgeHtml +
+          '</div>' +
+          '<p class="sr-card-body">«' + esc(t(opt.statement)) + '»</p>' +
+        '</button>'
+      );
+    }).join('');
+
+    const shortcutHint =
+      '<p class="sr-shortcuts small">' +
+        tr(
+          'Atajos del presentador: teclas [1]–[5] para seleccionar o deseleccionar tarjetas · [Espacio] para confirmar al tener 2 descartes · [Enter] activa el botón enfocado.',
+          'Presenter shortcuts: keys [1]–[5] to select or deselect cards · [Space] to confirm when 2 discards are selected · [Enter] activates focused control.'
+        ) +
+      '</p>';
+
+    return (
+      head(
+        tr('04 / Survival Run · Descarte de mitos y trampas', '04 / Survival Run · Myth and trap discard'),
+        tr('PLAN DE CONTINGENCIA', 'CONTINGENCY PLAN')
+      ) +
+      consignaBlock +
+      timerBlock +
+      '<div class="sr-cards" role="group" aria-label="' + tr('Opciones del plan de contingencia', 'Contingency plan options') + '">' +
+        cardsHtml +
+      '</div>' +
+      shortcutHint
+    );
+  },
+  function validationSlide() {
+    const ev = evaluateSurvivalPlan();
+    const cfg = MISSION.survivalConfig;
+    const incompleteNote = ev.discardCount < cfg.maxDiscards
+      ? '<p class="sr-incomplete-note">' +
+          tr(
+            'Se registraron ' + ev.discardCount + ' de ' + cfg.maxDiscards + ' descartes posibles. Se evalúan únicamente las decisiones reales tomadas; las opciones restantes permanecieron activas en el plan.',
+            'Recorded ' + ev.discardCount + ' of ' + cfg.maxDiscards + ' possible discards. Only actual decisions are evaluated; remaining options stayed active in the plan.'
+          ) +
+        '</p>'
+      : '';
+
+    const summaryBar =
+      '<div class="sr-summary-strip panel">' +
+        '<span class="sr-stat-chip"><strong>' + ev.discardCount + '/' + cfg.maxDiscards + '</strong> ' + tr('Descartes aplicados', 'Discards applied') + '</span>' +
+        '<span class="sr-stat-chip is-neutralized">✓ <strong>' + ev.neutralized.length + '</strong> ' + tr('Neutralizadas', 'Neutralized') + '</span>' +
+        '<span class="sr-stat-chip is-conserved">● <strong>' + ev.conserved.length + '</strong> ' + tr('Conservadas', 'Conserved') + '</span>' +
+        '<span class="sr-stat-chip is-critical-error">✕ <strong>' + ev.criticalErrors.length + '</strong> ' + tr('Errores críticos', 'Critical errors') + '</span>' +
+        '<span class="sr-stat-chip is-active-trap">⚠ <strong>' + ev.activeTraps.length + '</strong> ' + tr('Trampas activas', 'Active traps') + '</span>' +
+      '</div>' +
+      incompleteNote;
+
+    const reportCards = ev.items.map(item =>
+      '<article class="sr-val-card is-' + item.tone + '">' +
+        '<div class="sr-val-top">' +
+          '<div>' +
+            '<h3 class="sr-val-title">' + tr('Opción ', 'Option ') + item.id + ' — ' + esc(t(item.title)) + '</h3>' +
+            '<p class="sr-val-quote">«' + esc(t(item.statement)) + '»</p>' +
+          '</div>' +
+          '<span class="sr-status-pill is-' + item.tone + '">' + item.icon + ' ' + esc(t(item.badge)) + '</span>' +
+        '</div>' +
+        '<dl class="sr-val-meta">' +
+          '<div><dt>' + tr('Decisión tomada', 'Decision taken') + '</dt><dd>' + esc(t(item.decisionLabel)) + '</dd></div>' +
+          '<div><dt>' + tr('Clasificación técnica real', 'Real technical classification') + '</dt><dd>' + esc(t(item.realClassLabel)) + '</dd></div>' +
+          '<div><dt>' + tr('Resultado', 'Outcome') + '</dt><dd>' + esc(t(item.result)) + '</dd></div>' +
+        '</dl>' +
+        '<p class="sr-val-impact">' + esc(t(item.explanation)) + '</p>' +
+      '</article>'
+    ).join('');
+
+    const navActions =
+      '<div class="actions sr-stage-actions">' +
+        btn(tr('Ejecutar Simulación de Impacto', 'Run Impact Simulation') + ' →', 'advanceToSimulation()', 'primary', 'id="srRunSimBtn"') +
+        btn(tr('Volver a Decisión', 'Back to Decision'), 'go(4)') +
+        '<span class="small">' + tr('[Espacio]: ejecutar simulación de impacto', '[Space]: run impact simulation') + '</span>' +
+      '</div>';
+
+    return (
+      head(
+        tr('05 / Survival Run · Validación técnica instantánea', '05 / Survival Run · Instant technical validation'),
+        tr('Diagnóstico del plan de contingencia', 'Contingency plan diagnosis'),
+        tr('Informe técnico derivado exclusivamente de las decisiones registradas en la fase anterior.', 'Technical report derived exclusively from the decisions recorded in the previous phase.')
+      ) +
+      summaryBar +
+      '<div class="sr-validation-list">' + reportCards + '</div>' +
+      navActions
+    );
+  },
+  function simulationSlide() {
+    const sim = buildSimulationSummary();
+    const ev = sim.evaluation;
+    const res = sim.resilience;
+    const rawFormatted = String(res.rawScore).replace('.', state.lang === 'es' ? ',' : '.');
+
+    const scoreHero =
+      '<div class="sr-sim-hero">' +
+        '<div class="sr-score-card panel is-' + res.level + '">' +
+          '<div class="eyebrow">' + tr('Índice de resiliencia urbana', 'Urban resilience index') + '</div>' +
+          '<div class="sr-score-row">' +
+            '<strong class="sr-score-num" id="srResilienceScore">' + res.score + '%</strong>' +
+            '<span class="sr-level-pill is-' + res.level + '" id="srResilienceLevel">' + esc(t(res.label)) + '</span>' +
+          '</div>' +
+          '<div class="sr-meter" aria-hidden="true"><div class="sr-meter-fill is-' + res.level + '" style="width:' + res.score + '%"></div></div>' +
+          '<p class="sr-formula small">' +
+            tr(
+              'Cálculo determinista: 25 × ' + res.validRetained + ' válidas conservadas + 12,5 × ' + res.trapsDiscarded + ' trampas neutralizadas = ' + rawFormatted + ' pts',
+              'Deterministic formula: 25 × ' + res.validRetained + ' valid conserved + 12.5 × ' + res.trapsDiscarded + ' traps neutralized = ' + rawFormatted + ' pts'
+            ) +
+          '</p>' +
+        '</div>' +
+        '<div class="panel sr-conclusion-card">' +
+          '<div class="tag">' + tr('CONCLUSIÓN DINÁMICA DEL ESCENARIO', 'DYNAMIC SCENARIO CONCLUSION') + '</div>' +
+          '<p class="sr-conclusion-text">' + esc(t(sim.conclusion)) + '</p>' +
+          '<p class="small sr-disclaimer">' +
+            tr(
+              'Nota metodológica: esta puntuación es un índice didáctico de las decisiones tomadas (ÓPTIMO: 87,5–100 · COMPROMETIDO: 50–87 · CRÍTICO: 0–49). No es un modelo probabilístico ni una estimación real de daños, víctimas o pérdidas.',
+              'Methodological note: this score is an educational index of the decisions made (OPTIMAL: 87.5–100 · COMPROMISED: 50–87 · CRITICAL: 0–49). It is not a probabilistic model or a real estimate of damage, casualties or losses.'
+            ) +
+          '</p>' +
+        '</div>' +
+      '</div>';
+
+    const indicatorsHtml = sim.indicators.map(ind => {
+      const toneCls = ind.favorable ? 'is-favorable' : 'is-vulnerable';
+      const icon = ind.favorable ? '✓' : '⚠';
+      return (
+        '<article class="sr-ind-card panel ' + toneCls + '" data-indicator="' + ind.key + '">' +
+          '<div class="sr-ind-head">' +
+            '<h3>' + esc(t(ind.title)) + '</h3>' +
+            '<span class="sr-ind-badge ' + toneCls + '">' + icon + ' ' + esc(t(ind.status)) + '</span>' +
+          '</div>' +
+          '<p>' + esc(t(ind.detail)) + '</p>' +
+        '</article>'
+      );
+    }).join('');
+
+    const doorRisk = sim.doorFrameBehavioralRisk;
+    const doorTone = doorRisk.favorable ? 'is-favorable' : 'is-vulnerable';
+    const doorBlock =
+      '<article class="sr-behavior-card panel ' + doorTone + '" id="srDoorMythCard" data-indicator="doorFrameMythRisk">' +
+        '<div class="sr-ind-head">' +
+          '<h3>' + esc(t(doorRisk.title)) + '</h3>' +
+          '<span class="sr-ind-badge ' + doorTone + '">' + (doorRisk.favorable ? '✓ ' : '⚠ ') + esc(t(doorRisk.status)) + '</span>' +
+        '</div>' +
+        '<p>' + esc(t(doorRisk.detail)) + '</p>' +
+      '</article>';
+
+    const breakdownGrid =
+      '<div class="sr-breakdown-grid">' +
+        '<div class="panel sr-b-box is-conserved">' +
+          '<h4>● ' + tr('Medidas válidas conservadas', 'Valid measures conserved') + ' (' + ev.conserved.length + '/3)</h4>' +
+          renderItemList(ev.conserved, 'Ninguna medida válida conservada.', 'No valid measures conserved.') +
+        '</div>' +
+        '<div class="panel sr-b-box is-neutralized">' +
+          '<h4>✓ ' + tr('Trampas neutralizadas', 'Neutralized traps') + ' (' + ev.neutralized.length + '/2)</h4>' +
+          renderItemList(ev.neutralized, 'Ninguna trampa neutralizada.', 'No traps neutralized.') +
+        '</div>' +
+        '<div class="panel sr-b-box is-critical-error">' +
+          '<h4>✕ ' + tr('Errores críticos cometidos', 'Critical errors committed') + ' (' + ev.criticalErrors.length + ')</h4>' +
+          renderItemList(ev.criticalErrors, 'Sin errores críticos.', 'No critical errors.') +
+        '</div>' +
+        '<div class="panel sr-b-box is-active-trap">' +
+          '<h4>⚠ ' + tr('Trampas que permanecen activas', 'Traps remaining active') + ' (' + ev.activeTraps.length + ')</h4>' +
+          renderItemList(ev.activeTraps, 'Sin trampas activas.', 'No active traps.') +
+        '</div>' +
+      '</div>';
+
+    const simActions =
+      '<div class="actions sr-stage-actions">' +
+        btn(
+          tr('Continuar con el cierre', 'Continue to closing') + ' →',
+          'continueToClosing()',
+          'primary',
+          'id="srClosingBtn"' + (state.survival.closingOpen ? ' disabled' : '')
+        ) +
+        btn(tr('Volver a Validación', 'Back to Validation'), 'go(5)') +
+        btn(tr('Reiniciar Survival Run', 'Reset Survival Run'), 'timerReset(true)') +
+        (!state.survival.closingOpen ? '<span class="small">' + tr('[Espacio]: continuar con el cierre', '[Space]: continue to closing') + '</span>' : '') +
+      '</div>';
+
+    const closingSection = state.survival.closingOpen
+      ? '<section id="cierre" class="sr-closing panel" aria-labelledby="closingTitle">' +
+          '<div class="eyebrow">' + tr('Sección final de la presentación', 'Final section of the presentation') + '</div>' +
+          '<h3 tabindex="-1" id="closingTitle">' + tr('Síntesis final: suelo, estructuras y decisiones basadas en evidencia', 'Final synthesis: ground, structures and evidence-based decisions') + '</h3>' +
+          p(tr(
+            'La evidencia analizada en el laboratorio y en los expedientes reales (Loma Prieta 1989 y Christchurch 2011) confirma que los daños sísmicos dependen tanto del comportamiento del terreno y la calidad estructural como de protocolos de emergencia técnicamente rigurosos.',
+            'Evidence from the laboratory and real case studies (Loma Prieta 1989 and Christchurch 2011) confirms that seismic damage depends on ground behaviour, structural quality and technically sound emergency protocols.'
+          )) +
+          box('flat',
+            h(tr('Última ronda: 20 segundos por equipo', 'Final round: 20 seconds per team')) +
+            p(tr('«Antes pensábamos ___. Ahora sostenemos ___, porque la evidencia ___.»', '“We used to think ___. Now we argue ___, because the evidence ___.”'), 'quote')
+          ) +
+          box('actions',
+            btn(tr('Descargar informe de la misión', 'Download mission report'), 'downloadReport()', 'primary') +
+            btn(tr('Investigación completa', 'Full research paper'), 'openPaper()') +
+            btn(tr('Fuentes documentales', 'Documentary sources'), 'openSources()') +
+            btn(tr('Nueva clase', 'New class'), 'resetMission()')
+          ) +
+          p(storageAvailable
+            ? tr('Las decisiones se guardan localmente en este navegador. El informe registra la evaluación didáctica, no predicciones reales de daños.', 'Decisions are stored locally in this browser. The report records the educational assessment, not real damage predictions.')
+            : tr('El navegador no permite guardar el progreso local. Descargá el informe antes de cerrar.', 'This browser blocks local storage. Download the report before closing.'),
+            'small'
+          ) +
+        '</section>'
+      : '';
+
+    return (
+      head(
+        tr('06 / Survival Run · Simulación de impacto urbano', '06 / Survival Run · Urban impact simulation'),
+        tr('Balance y consecuencias sísmicas', 'Seismic balance and consequences'),
+        tr('Estado hipotético postevento calculado de forma determinista a partir del plan evaluado.', 'Hypothetical post-event status deterministically computed from the evaluated plan.')
+      ) +
+      scoreHero +
+      '<h3 class="sr-section-heading">' + tr('Indicadores independientes del escenario postevento', 'Independent post-event scenario indicators') + '</h3>' +
+      '<div class="sr-indicators-grid">' + indicatorsHtml + '</div>' +
+      doorBlock +
+      breakdownGrid +
+      simActions +
+      closingSection
+    );
   }
-  const feedbackIds=['understanding','explain','connect','confidence','clarity','newconcept','example'];
-  function miniChart(s,p){const v=s.polls[p.id],st=K.pollStats(s,p.id);return `<div class="mini-chart"><h4>${e(p.title)}</h4><p class="small">${status(v.status)} · n=${st.n}${s.session.size!==null?` of ${s.session.size}`:''}${!st.completed?' · excluded from completed results':''}</p>${st.n?v.counts.map((n,i)=>`<div class="mini-row"><span>${e(p.options[i])}</span><span class="track"><span style="width:${n/st.n*100}%"></span></span><b>${n}</b></div>`).join(''):'<p class="small">No responses recorded.</p>'}${st.correct!==null?`<p class="small accent">${st.correct} / ${st.n} recorded hands selected the supported answer (${st.percent}%).</p>`:''}</div>`}
-  function plan(s){return C.budget.map(o=>b(`<div><b>${o.title}</b><span>${o.detail}</span></div><strong class="cost">${o.cost}</strong>`,'budget',`id="budget-${o.id}" data-id="${o.id}" aria-pressed="${s.council.selected.includes(o.id)}"`,'budget-choice')).join('')}
-  function budgetMeter(s){const n=K.budgetTotal(s);return `<div class="budget-meter"><span class="kicker">Class allocation</span><strong>${n}<span class="muted" style="font-size:1.1rem"> / 10</span></strong></div><div class="budget-slots" aria-label="${n} of 10 fictional credits allocated">${Array.from({length:10},(_,i)=>`<i class="${i<n?'used':''}"></i>`).join('')}</div>`}
-  function reflectionCard(r,i){return `<article class="reflection-card"><p class="kicker">Sample ${i+1} · ${r.kind==='application'?'application explanation':'reported new learning'}</p><blockquote>${e(r.text)}</blockquote>${r.peerStrength?`<p><b>Peer noticed:</b> ${e(r.peerStrength)}</p>`:''}${r.peerNext?`<p><b>Peer suggested:</b> ${e(r.peerNext)}</p>`:''}${r.kind==='application'?`<p class="small">Observed by presenter: ${['ground mechanism','structural factor','uncertainty / limit'].filter((_,j)=>r.criteria[j]).join(' · ')||'no features marked yet'}. This is a spoken sample, not a class grade.</p>`:''}<div class="actions">${b('Edit','edit-reflection',`data-index="${i}"`)}${b('Remove','remove-reflection',`data-index="${i}"`,'ghost')}</div></article>`}
-  function teacherSummary(s){const t=s.teacher;return `<div class="teacher-summary"><p>${status(t.status)} · Evaluation date: ${e(t.date)}${t.confirmedAt?` · confirmed ${e(t.confirmedAt)}`:''}</p><table><thead><tr><th>Criterion</th><th>Assessment</th></tr></thead><tbody>${C.faculty.map(c=>{const n=t.scores[c.id];return `<tr><td>${c.title}</td><td>${typeof n==='number'?`${n} / 4 — ${c.levels[n-1]}`:n==='na'?'Not observed':'Not rated'}</td></tr>`}).join('')}</tbody></table>${[['Overall evaluation',t.overall===null?'':t.overall==='na'?'Not observed':t.overall+' / 4'],['Main strengths',t.strengths],['Suggested improvements',t.improvements],['Additional comments',t.comments],['Teacher name (voluntary)',t.name]].filter(x=>x[1]).map(([l,v])=>`<p class="small"><b>${l}:</b> ${e(v)}</p>`).join('')}</div>`}
-  const pages=[
-    s=>`<div class="hero"><div><div class="eyebrow"><span class="rule"></span>A classroom field investigation</div><h1 id="slide-title" tabindex="-1">Same earthquake.<br><em>Different stories.</em></h1><p class="lede">Why do earthquakes damage some places more than others?</p><p class="muted">Look below the surface. Follow the evidence.<br>Then decide what your town should protect.</p><div class="hero-foot">${b('Begin the investigation →','next','','primary')}${b('Session & data','session','','ghost')}</div><div class="hero-numbers"><span><b>02</b>real earthquake case files</span><span><b>01</b>computer · the whole class</span><span><b>30–35</b>minutes + teacher review</span></div></div><div>${V.hero()}<p class="small">Fictional neighbourhoods · conceptual illustration · no damage prediction</p></div></div>`,
-    s=>head(1,'Make a prediction.<br><em>Give us your reason.</em>','Same earthquake. Similar distance from the fault. Compare two neighbourhoods, then discuss for 30 seconds.')+`<div class="two"><article class="panel flat"><p class="kicker">A / Riverside</p><h3>Loose saturated sand.<br>Unreinforced homes.</h3><p class="small">Weak wall-to-roof connections; susceptible ground.</p></article><article class="panel flat"><p class="kicker">B / Hilltop</p><h3>Firm rock.<br>Seismic connections.</h3><p class="small">Well-designed connections and reinforcement, under the stated assumptions.</p></article></div>`+poll(s,'prediction'),
-    s=>head(2,'The earthquake is the source.<br><em>Your location changes the experience.</em>','Magnitude describes the size of the event. Intensity describes shaking and effects at a particular place.')+`<div class="diagram-box">${V.pathway()}<p class="small">Conceptual pathway · not a map or measured intensity model</p></div><div class="four" style="margin-top:1rem"><div><p class="kicker">Source</p><h3>Magnitude & depth</h3><p class="small">Magnitude relates to energy released. It does not change from street to street.</p></div><div><p class="kicker">Travel</p><h3>Distance & wave path</h3><p class="small">Seismic waves change as they travel through the Earth.</p></div><div><p class="kicker">Site</p><h3>Local ground</h3><p class="small">Soil layers can change shaking. Some saturated soils can lose strength.</p></div><div><p class="kicker">Response</p><h3>Building vulnerability</h3><p class="small">Connections, materials, foundations and design influence damage.</p></div></div><div class="callout">Ask: which of these can differ between two streets during the same earthquake?</div><details><summary>A useful measurement detail</summary><p>Different magnitude methods or later estimates can produce slightly different published values for the same event. That is different from intensity varying by location.</p></details>`+sources('paper','usgs-intensity'),
-    s=>{const axis=s.ui.labAxis,ground=axis==='ground'?s.ui.ground:'rock',structure=axis==='structure'?s.ui.structure:'designed';return head(3,'Change one condition.<br><em>Follow the mechanism.</em>','Site A stays fixed. Predict what could change at Site B before revealing. These diagrams do not calculate damage.')+`<div class="tabs" role="group" aria-label="Variable to compare">${b('01 · Compare ground','lab-axis','data-value="ground" aria-pressed="'+(axis==='ground')+'"')}${b('02 · Compare structures','lab-axis','data-value="structure" aria-pressed="'+(axis==='structure')+'"')}</div><div class="two"><div class="diagram-box">${V.ground('rock','designed',s.ui.labRevealed,'A / Reference')}<p class="small">Fixed conditions · schematic motion, not measured</p></div><div class="diagram-box">${V.ground(ground,structure,s.ui.labRevealed,'B / Test site')}<p class="small">${axis==='ground'?'The building design stays the same.':'The ground stays the same.'}</p></div></div><div class="actions compact">${axis==='ground'?['rock','soft','wet'].map((x,i)=>b(['Firm rock','Soft soil','Loose saturated sand'][i],'lab-ground',`data-value="${x}" aria-pressed="${s.ui.ground===x}"`)).join(''):['designed','weak'].map((x,i)=>b(['Seismic connections','Unreinforced connections'][i],'lab-structure',`data-value="${x}" aria-pressed="${s.ui.structure===x}"`)).join('')}${b(s.ui.labRevealed?'Replay / reveal again':'Reveal the mechanism','lab-reveal','','primary')}${b('Show without motion','lab-static','','ghost')}</div>${s.ui.labRevealed?`<div class="answer" role="status"><b>${axis==='structure'?'The load path matters':ground==='wet'?'Ground support can fail':ground==='soft'?'Local amplification is possible':'A useful reference, not a guarantee'}</b>${axis==='structure'?'Strong connections help transfer forces between roofs, floors, walls and foundations. Unreinforced masonry can separate or fail. Even well-designed buildings can be damaged under extreme shaking.':ground==='wet'?'Strong shaking can increase pore-water pressure and reduce strength in susceptible saturated soil. Foundations may settle or move sideways even if the structure is reinforced.':ground==='soft'?'Soft soil can amplify certain parts of seismic shaking. The effect depends on soil properties, layer depth, shaking characteristics and the building’s response; it is not a fixed multiplier.':'Both sites now have the same displayed ground and structural assumptions. Real sites still vary, and rock does not eliminate earthquake risk.'}</div>`:'<div class="reveal-placeholder">Discuss: what changed, what stayed fixed, and what extra evidence would you want?</div>'}`+sources('paper','usgs-liquefaction')},
-    s=>{const step=s.ui.liquidStep;return head(4,'Sometimes the failure<br><em>starts below the building.</em>','Liquefaction is a loss of soil strength. The grains do not literally turn into water.')+`<div class="split-wide"><div class="diagram-box">${V.grains(step)}</div><div><div class="step-row">${['Before','During','Possible effects'].map((x,i)=>b(`${i+1} · ${x}`,'liquid-step',`data-value="${i}" aria-pressed="${step===i}"`)).join('')}</div><p class="number">0${step+1}</p><h3>${['Grains carry the load','Water pressure rises','Support can become unstable'][step]}</h3><p class="muted">${['In loose saturated sand, water occupies spaces between grains. Contacts between grains help the soil carry loads.','Strong shaking can raise pressure in the pore water. Effective forces between grains decrease, so susceptible soil loses strength.','The ground may settle, crack or move sideways. Foundations, roads and pipes can be damaged even without major failure of the walls above.'][step]}</p><div class="callout blue-note">Required conditions matter: susceptible soil, saturation and sufficient shaking. Not every wet soil liquefies.</div></div></div>`+sources('paper','usgs-liquefaction')},
-    s=>{const l=s.ui.case==='loma';return head(5,'Two case files.<br><em>One question to investigate.</em>','Read the observations, build an explanation, then check its limits.')+`<div class="tabs" role="group" aria-label="Earthquake case">${b('01 · Loma Prieta / 1989','case','data-value="loma" aria-pressed="'+l+'"')}${b('02 · Christchurch / 2011','case','data-value="christchurch" aria-pressed="'+(!l)+'"')}</div><div class="split-wide"><div><p class="case-date">${l?'17 OCTOBER 1989 / CALIFORNIA':'22 FEBRUARY 2011 / NEW ZEALAND'}</p><div class="case-heading"><span class="number">${l?'1989':'2011'}</span><h3>${l?'Damage beyond the epicentre':'When the ground gives way'}</h3></div><ul class="evidence-list">${(l?['Serious damage occurred in parts of San Francisco and Oakland as well as nearer the earthquake source.','The Marina District showed amplified shaking and liquefaction in susceptible ground and fill.','Vulnerable structures failed, including the Cypress Street Viaduct in Oakland.']:['Sand and water reached the surface in affected areas; settlement and lateral ground movement damaged infrastructure.','Unreinforced masonry was vulnerable. The paper also records failures of modern concrete office buildings.','The city experienced stronger shaking than during the larger 2010 Darfield event. Proximity and shallow depth were important.']).map((v,i)=>`<li><b>0${i+1}</b><span>${v}</span></li>`).join('')}</ul></div><div class="stack"><article class="panel"><p class="kicker">Interpretation</p><h3>${l?'Distance alone is not enough.':'Magnitude alone is not enough.'}</h3><p class="small">${l?'Local soil conditions and structural vulnerabilities help explain why damage was uneven. Loma Prieta had moment magnitude 6.9; different neighbourhoods did not have their own source magnitudes.':'Ground failure can damage foundations, while intense local shaking can damage structures. Buildings, ground, distance and depth interact.'}</p></article><article class="panel flat"><p class="kicker">Limits of the evidence</p><p class="small">These are real observations from reports and inspections. They support the hypothesis, but do not isolate every factor like a controlled experiment or predict an individual building’s outcome.</p></article><div class="callout">Partner challenge: cite one observation, explain a mechanism, and name one other factor.</div></div></div><p class="small method-note">Research method: documentary comparison of two earthquakes. We did not carry out the field inspections. ${l?'':'Source note: published magnitude methods differ. GeoNet’s heading reports M6.2; its historical narrative also gives ML6.3. No cross-scale damage ranking is calculated.'}</p>`+sources('paper',l?'nist':'geonet',l?'usgs-loma':'aidr')},
-    s=>head(6,'A building is more than<br><em>its age or its material.</em>','Connections create a path for earthquake forces. Reinforcement and ductility can improve the response.')+`<div class="two"><article class="diagram-box">${V.ground('rock','weak',false,'A / Unreinforced connections')}<h3>Weak links in the structure</h3><p class="small">Walls may separate from floors or roofs. Brittle elements can lose their ability to carry loads.</p></article><article class="diagram-box">${V.ground('rock','designed',false,'B / Seismic connections')}<h3>A better-connected system</h3><p class="small">Appropriate connections and reinforcement help transfer forces. Ductility allows deformation without sudden brittle failure.</p></article></div><div class="callout">“Modern” does not mean “earthquake-proof”. Foundations, materials, design, construction quality and the actual shaking all matter.</div><details><summary>Explain your reasoning</summary><p>If the ground stays the same, why might these buildings respond differently? Now change both sites to susceptible saturated sand: which risk remains even for the reinforced building?</p></details>`+sources('paper'),
-    s=>head(7,'You are the investigator.<br><em>What does the evidence support?</em>','Think → discuss → vote → explain → reveal. Record the class reason before showing the answer.')+`<div class="tabs" role="group" aria-label="Knowledge check">${b('01 · Read the clues','check','data-value="0" aria-pressed="'+(s.ui.check===0)+'"')}${b('02 · Apply the idea','check','data-value="1" aria-pressed="'+(s.ui.check===1)+'"')}</div>`+poll(s,s.ui.check===0?'investigator':'transfer')+`<div class="actions">${b(s.ui.check===0?'Next knowledge check →':'Continue to the town council →',s.ui.check===0?'next-check':'next','','primary')}</div>`,
-    s=>head(8,'Ten credits.<br><em>What should your town protect?</em>','Work in groups of 3–4: a science adviser, a budget keeper and a residents’ representative. Propose a plan aloud.')+`<div class="two"><div>${plan(s)}<p class="small">Fictional town and costs. Each action can be funded once. No lives-saved or damage-reduction estimates are invented.</p></div><div class="panel">${budgetMeter(s)}${field('Our scientific reason','council.reason',s.council.reason,'placeholder="We prioritised… because…"')}${field('One risk our plan leaves unresolved','council.risk',s.council.risk,'placeholder="Even with this plan…"')}<p class="small">Listen to at least two plans before recording the class decision. You may leave credits unspent.</p></div></div>`,
-    s=>head(9,'Protection is also<br><em>a question of fairness.</em>','Science helps us understand risk. Communities decide how protection is shared.')+`<div class="two"><div><p class="kicker">Laudato Si’ / an ethical connection</p><p class="big-quote">Should safer housing depend on what a family can afford?</p><p class="small">Francis links housing with human dignity and asks planners to listen to residents (§§150–152). The common good calls for particular concern for people in poverty (§158).</p>${b(s.council.residents?'Residents’ context revealed ✓':'Reveal the residents’ context','residents','','primary')}${s.council.residents?'<div class="callout">Fictional scenario: some families cannot afford repairs. The school will also serve as an emergency shelter. Both needs matter. Whose voice should be heard before deciding?</div>':''}<p class="small method-note">This is an application of ethical principles to preparedness. The encyclical is not a technical earthquake manual; pollution does not explain these tectonic earthquakes.</p></div><div class="panel">${budgetMeter(s)}${plan(s)}${field('Keep or revise the plan: who benefits, and why?','council.equity',s.council.equity)}<p class="small">A peer responds: “One scientific strength is… One thing to improve is…”</p></div></div>`+sources('paper','laudato'),
-    s=>{const id=feedbackIds[s.ui.feedback];return head(10,'Take the class pulse.<br><em>What changed for you?</em>','Quick reflection · about 2 minutes. These ratings describe how students feel about their learning.')+`<div class="tabs" aria-label="Feedback questions">${feedbackIds.map((x,i)=>b(`${i+1}${x==='example'?' · optional':''}`,'feedback-jump',`data-value="${i}" aria-pressed="${s.ui.feedback===i}" aria-label="Question ${i+1}: ${e(C.polls.find(p=>p.id===x).title)}"`)).join('')}</div>`+poll(s,id)+`<div class="actions">${b('← Previous question','feedback-prev',s.ui.feedback===0?'disabled':'')}${b(s.ui.feedback===6?'Continue to spoken reflections →':'Next question →','feedback-next','','primary')}${b('Skip remaining feedback','skip-feedback','','ghost')}</div><p class="small">Move on any time; unfinished counts stay saved and are labelled in progress. Five rubric dimensions, one new-concept vote and one optional example vote.</p>`},
-    s=>{const d=s.reflectionDraft;return head(11,'Explain it to someone else.<br><em>Then improve it together.</em>','What is one thing you learned today that you did not know before?')+`<div class="two"><div><div class="panel"><p class="kicker">60-second peer exchange</p><h3>Say it. Listen. Give feedback.</h3><p class="small">One student explains. Their partner identifies one scientific strength and suggests one improvement. Hear 2–3 samples aloud; the presenter records short paraphrases.</p><div class="callout blue-note"><b>Application question:</b> Two locations experience the same earthquake but have different ground conditions. Why might their damage differ? Include a building factor and something you cannot conclude yet.</div></div><div style="margin-top:1rem">${s.reflections.length?s.reflections.map(reflectionCard).join(''):'<p class="small">No spoken responses have been recorded. Student names are not needed.</p>'}</div></div><div class="panel"><h3>Capture a spoken sample</h3><label class="label" for="reflectionDraft.kind">Response type</label><select id="reflectionDraft.kind" data-field="reflectionDraft.kind"><option value="learning" ${d.kind==='learning'?'selected':''}>One thing I learned</option><option value="application" ${d.kind==='application'?'selected':''}>Application explanation</option></select>${field('Student response (short paraphrase)','reflectionDraft.text',d.text,'maxlength="700" placeholder="Record what was actually said…"')}${field('Peer feedback: one scientific strength','reflectionDraft.peerStrength',d.peerStrength,'maxlength="400"')}${field('Peer feedback: one suggested improvement','reflectionDraft.peerNext',d.peerNext,'maxlength="400"')}<fieldset class="checks"><legend class="small">For application samples: features the presenter heard</legend>${['A correct ground mechanism','A relevant structural factor','A limit or uncertainty'].map((v,i)=>`<label><input type="checkbox" data-observed="${i}" ${d.criteria[i]?'checked':''}>${v}</label>`).join('')}</fieldset><div class="actions">${b('Save spoken sample','add-reflection','','primary')}${b('Clear draft','clear-reflection-draft','','ghost')}</div><p class="small">Up to 6 samples. These are qualitative observations, not evidence that every student understands.</p></div></div>`},
-    s=>head(12,'A professional second view.<br><em>Faculty evaluation.</em>','The classroom teacher can use this computer directly or dictate feedback to the presenter.')+`<div class="split-wide"><div><p class="number">7<span style="font-size:1rem;letter-spacing:0"> criteria</span></p><ul class="feature-list">${C.faculty.map((c,i)=>`<li><b>0${i+1}</b> &nbsp; ${c.title}</li>`).join('')}</ul></div><div class="panel"><p class="kicker">3–5 minutes / same computer</p><h3>Score, review, confirm.</h3><p class="muted">Use the 1–4 descriptors for each criterion. Choose “Not observed” when there is not enough evidence.</p><p class="small">Comments and the teacher’s name are optional. Nothing is uploaded. Information entered here can be visible on the projector.</p><p class="faculty-status">${status(s.teacher.status)} · ${C.faculty.filter(c=>s.teacher.scores[c.id]!==null).length} / 7 criteria addressed</p><div class="actions">${b(s.teacher.status==='confirmed'?'Review / edit evaluation':'Open teacher rubric','teacher','','primary')}${b('Continue and return later →','next','','ghost')}</div></div></div>`,
-    s=>{const checks=C.polls.filter(p=>p.kind==='knowledge'),complete=checks.filter(p=>K.pollStats(s,p.id).completed),surveys=C.polls.filter(p=>['rubric','concept','experience'].includes(p.kind));return head(13,'Learning leaves evidence.<br><em>Keep the two views separate.</em>','Review what was actually recorded, then export the session report.')+`<div class="dashboard-stats"><div class="stat"><strong>${complete.length} / 2</strong><span>knowledge checks completed · no combined mastery score</span></div><div class="stat"><strong>${s.reflections.length}</strong><span>spoken samples recorded · not unique-student coverage</span></div><div class="stat"><strong>${C.faculty.filter(c=>s.teacher.scores[c.id]!==null).length} / 7</strong><span>faculty criteria addressed · ${s.teacher.status}</span></div></div><div class="actions">${b('Review / print report','report','','primary')}${b('Download JSON backup','json')}${b('Download CSV','csv')}${b('Session & data','session','','ghost')}</div><div class="two" style="margin-top:1.3rem"><div class="panel"><p class="kicker">Demonstrated answers</p>${checks.map(p=>miniChart(s,p)).join('')}<p class="small">Percentages use each completed question’s recorded hands, including “not sure”. They are not grades or measured learning gains.</p></div><div class="panel"><p class="kicker">Reported understanding & new concepts</p>${surveys.map(p=>`<details ${p.id==='understanding'||p.id==='newconcept'?'open':''}><summary>${p.title}</summary>${miniChart(s,p)}</details>`).join('')}</div></div><div class="two" style="margin-top:1rem"><div class="panel"><p class="kicker">Recorded reflections</p>${s.reflections.length?s.reflections.map(reflectionCard).join(''):'<p class="small">None recorded.</p>'}</div><div class="panel"><p class="kicker">Faculty view</p><p class="small">${status(s.teacher.status)} · ${C.faculty.filter(c=>typeof s.teacher.scores[c.id]==='number').length} scored; ${C.faculty.filter(c=>s.teacher.scores[c.id]==='na').length} not observed.</p><p class="small">${s.teacher.status==='confirmed'?'Confirmed by the operator after review. No signature or identity verification is implied.':'A draft is not a final teacher evaluation.'}</p>${b('Review teacher feedback','teacher')}${s.teacher.strengths?`<p class="small" style="margin-top:1rem"><b>Strengths:</b> ${e(s.teacher.strengths)}</p>`:''}</div></div>`},
-    s=>head(14,'One earthquake.<br><em>Many interacting causes.</em>','Ground conditions and building vulnerability help explain why damage differs. Distance, depth and local shaking also matter.')+`<div class="three"><article class="panel flat"><p class="kicker">01 / The ground</p><h3>Shaking can change.<br>Support can fail.</h3><p class="small">Amplification and liquefaction are different mechanisms. Neither happens identically everywhere.</p></article><article class="panel flat"><p class="kicker">02 / The structure</p><h3>Design and connections<br>change the response.</h3><p class="small">Better design reduces vulnerability. No building is guaranteed to escape damage.</p></article><article class="panel flat"><p class="kicker">03 / The community</p><h3>Protection requires<br>informed, fair choices.</h3><p class="small">Use the evidence, listen to residents and recognise the risks a limited budget leaves unresolved.</p></article></div>${V.wave()}<p class="big-quote">“We used to think ___. Now we argue ___, because the evidence ___.”</p><p class="small">Closing sentence starter, not a recorded student quotation.</p><div class="actions">${b('Return to our first prediction','jump','data-value="1"','primary')}${b('Learning evidence & exports','jump','data-value="13"')}${b('Research & sources','sources')}</div>`
-  ];
-  function render(s){const i=s.ui.slide;return `<section class="slide" aria-labelledby="slide-title">${pages[i](s)}${s.ui.guide?`<aside class="guide"><strong>Discussion guide · ${C.chapters[i][2]}</strong><br>${C.chapters[i][3]}</aside>`:''}</section>`}
-  function teacherForm(s,review=false){const t=s.teacher;if(review)return `<p class="lede">Check all scores and comments. Confirmation records this evaluation as final. You can still edit it later; editing returns it to draft.</p>${teacherSummary(s)}<div class="actions">${b('← Return to editing','teacher-edit')}${b('Confirm evaluation','teacher-confirm','','primary')}</div>`;return `<p class="lede">1 = major gaps · 2 = developing · 3 = effective · 4 = strong. Use the criterion-specific descriptions. Optional comments and name are visible on this computer.</p><p class="faculty-status">${status(t.status)} · All changes save locally as a draft until reviewed and confirmed.</p><div class="teacher-grid">${C.faculty.map(c=>`<div class="criterion"><p class="criterion-title">${c.title}</p><div class="rating-options" role="group" aria-label="${c.title}">${c.levels.map((l,i)=>b(`<b>${i+1}</b><span>${l}</span>`,'teacher-score',`id="score-${c.id}-${i+1}" data-id="${c.id}" data-value="${i+1}" aria-pressed="${t.scores[c.id]===i+1}"`)).join('')}${b('Not observed','teacher-score',`id="score-${c.id}-na" data-id="${c.id}" data-value="na" aria-pressed="${t.scores[c.id]==='na'}"`,'na')}</div></div>`).join('')}</div><div class="two">${field('Main strengths (optional)','teacher.strengths',t.strengths)}${field('Suggested improvements (optional)','teacher.improvements',t.improvements)}${field('Additional comments (optional)','teacher.comments',t.comments)}<div><label class="label" for="teacher.overall">Overall evaluation (optional)</label><select id="teacher.overall" data-field="teacher.overall"><option value="">Not provided</option>${[1,2,3,4].map(v=>`<option value="${v}" ${t.overall===v?'selected':''}>${v} / 4</option>`).join('')}</select><label class="label" for="teacher.name">Teacher’s name (voluntary)</label><input id="teacher.name" data-field="teacher.name" maxlength="80" value="${e(t.name)}"><label class="label" for="teacher.date">Evaluation date</label><input id="teacher.date" data-field="teacher.date" type="date" value="${e(t.date)}"></div></div><div class="actions">${b('Review before confirming →','teacher-review','','primary')}${b('Close and keep draft','close-modal','','ghost')}</div>`}
-  return {b,head,field,status,poll,render,pages,feedbackIds,miniChart,teacherForm,teacherSummary};
-})();
+];
+
+render();

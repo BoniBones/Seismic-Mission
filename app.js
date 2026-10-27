@@ -1,138 +1,787 @@
-/* DOM controller. Classroom data never leaves the browser except explicit downloads. */
 'use strict';
-(() => {
-  const K=SM.core,C=SM.content,V=SM.views,e=K.esc,b=V.b,$=id=>document.getElementById(id);
-  let loaded,storageFailed=false;
-  try{loaded=K.parse(localStorage.getItem(K.KEY))}catch{loaded={state:K.create(),warning:'This browser cannot save locally. Keep this tab open and download a JSON backup before leaving.',blocked:false,raw:null};storageFailed=true}
-  let state=loaded.state,blocked=loaded.blocked,warning=loaded.warning,rawCorrupt=loaded.raw;
-  const layout=SM.layout.create($('stage'),()=>state.ui.fit);
-  let modalType='',returnFocus=null,reviewing=false,pendingImport=null,pendingSource='',editingReflection=-1;
-  editingReflection=state.reflections.findIndex(r=>r.id===state.reflectionDraft.id);
-  let running=false,timerDuration=[30,60,180].includes(state.timer)?state.timer:60,noticeTimer;
-  const reflectionEmpty=()=>({id:'',text:'',kind:'learning',peerStrength:'',peerNext:'',criteria:[false,false,false]});
-  function toast(message){$('notice').textContent=message;$('notice').hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('notice').hidden=true,6000)}
-  function storageStatus(){const node=$('save-status');node.textContent=blocked?'Recovery needed':storageFailed?'Not saved':'Saved on this computer';node.classList.toggle('warning',blocked||storageFailed);$('storage-warning').hidden=!warning;$('storage-message').textContent=warning}
-  function save(){
-    if(blocked){storageStatus();return false}
-    try{
-      const prior=localStorage.getItem(K.KEY);
-      if(prior && !K.parse(prior).blocked)localStorage.setItem(K.BACKUP,prior);
-      localStorage.setItem(K.KEY,JSON.stringify(state));
-      if(storageFailed){warning='';storageFailed=false}
-      storageStatus();return true;
-    }catch{storageFailed=true;warning='Local saving failed. Your current work is still in this tab. Download a JSON backup before closing it.';storageStatus();return false}
-  }
-  function refreshPoll(id){
-    const p=C.polls.find(x=>x.id===id),v=state.polls[id],st=K.pollStats(state,id);
-    const panel=document.querySelector(`[data-poll="${id}"]`);
-    if(!panel)return;
-    panel.querySelectorAll('.tally').forEach((row,i)=>{const bar=row.querySelector('.track span');if(bar)bar.style.width=(v.counts[i]/(st.n||1)*100)+'%';const input=$('count-'+id+'-'+i);if(input)input.value=String(v.counts[i]);const minus=$('minus-'+id+'-'+i);if(minus)minus.disabled=v.counts[i]===0});
-    const status=panel.querySelector('.status-label');if(status){status.textContent='in progress';status.className='status-label draft'}
-    const note=panel.querySelector('.tally-note');if(note)note.textContent=st.n+' hands recorded'+(state.session.size!==null?' / '+state.session.size+' students · '+st.missing+' unrecorded':' · class size not entered')+'. One choice per student; count each hand once. This is a visible show of hands, not anonymous. Complete the tally to include it in the summary.'+(st.invalid?' Tally exceeds class size; excluded from summary.':'')+(v.revealed?' The explanation is visible; edits are corrections, not a fresh independent attempt.':'');
-    const complete=panel.querySelector('[data-action="complete-poll"]');if(complete)complete.textContent='Complete tally';
-    const reveal=panel.querySelector('[data-action="reveal-poll"]');if(reveal)reveal.disabled=true;
-  }
-  function clock(){const n=state.timer;$('clock').textContent=Math.floor(n/60)+':'+String(n%60).padStart(2,'0');$('timer-toggle').textContent=running?'Pause':'Start'}
-  function focusSnapshot(){const a=document.activeElement;return {id:a?.id,position:a?.selectionStart}}
-  function restoreFocus(f){if(!f.id)return;const a=$(f.id);if(a){a.focus({preventScroll:true});if(typeof f.position==='number'&&(['text','search','url','tel','password'].includes(a.type)||a.tagName==='TEXTAREA')){try{a.setSelectionRange(f.position,f.position)}catch{}}}}
-  function render(focusTitle=false){const f=focusSnapshot(),i=state.ui.slide;document.documentElement.classList.toggle('stop-motion',!state.ui.motion);$('stage').innerHTML='<div class="slide-frame">'+V.render(state)+'</div>';layout.refresh();$('chapter-rail').innerHTML=C.chapters.map((c,j)=>b(String(j+1).padStart(2,'0'),'jump',`data-value="${j}" title="${e(c[0])}" aria-label="${j+1}. ${e(c[0])}" ${i===j?'aria-current="step"':''}`,i===j?'current':'')).join('')+'<span class="rail-word">INVESTIGATE / EXPLAIN / REFLECT</span>';$('slide-count').textContent=String(i+1).padStart(2,'0')+' / '+C.chapters.length;$('chapter-name').textContent=C.chapters[i][0];$('bottom').style.setProperty('--progress',((i+1)/C.chapters.length*100)+'%');$('previous').disabled=i===0;$('next').disabled=i===C.chapters.length-1;$('next').textContent=i===C.chapters.length-1?'Mission complete ✓':'Continue →';$('guide-button').setAttribute('aria-pressed',String(state.ui.guide));$('fit-button').setAttribute('aria-pressed',String(state.ui.fit));clock();storageStatus();if(focusTitle){$('stage').scrollTop=0;$('slide-title')?.focus({preventScroll:true})}else restoreFocus(f)}
-  function go(index){state.ui.slide=K.int(index,0,C.chapters.length-1);running=false;if(modalType)closeModal();save();render(true)}
-  function stopTimer(){running=false;clock()}
-  function openModal(type,title,html){stopTimer();if(!$('dialog').open)returnFocus=document.activeElement;modalType=type;$('dialog-title').textContent=title;$('dialog-body').innerHTML=html.replace(/id="action-/g,'id="dialog-action-');if(!$('dialog').open)$('dialog').showModal();$('dialog').scrollTop=0;$('dialog').querySelector('button')?.focus()}
-  function replaceModal(html){const f=focusSnapshot(),scroll=$('dialog').scrollTop;$('dialog-body').innerHTML=html.replace(/id="action-/g,'id="dialog-action-');$('dialog').scrollTop=scroll;restoreFocus(f)}
-  function closeModal(){if($('dialog').open)$('dialog').close();modalType='';reviewing=false;pendingImport=null;render();const target=returnFocus;if(target?.isConnected)target.focus({preventScroll:true});else $('slide-title')?.focus({preventScroll:true})}
-  function sessionHtml(){return `<p class="lede">All results stay in this browser. Export a backup to move or protect a session. No student names or accounts are needed.</p><div class="three"><div><label class="label" for="session.label">Class label (optional)</label><input id="session.label" data-field="session.label" maxlength="80" placeholder="e.g. Year 3" value="${e(state.session.label)}"></div><div><label class="label" for="session.date">Presentation date</label><input id="session.date" data-field="session.date" type="date" value="${e(state.session.date)}"></div><div><label class="label" for="session.size">Number of students (optional)</label><input id="session.size" data-field="session.size" type="number" min="1" max="500" step="1" placeholder="Not entered" value="${state.session.size??''}"></div></div><p class="small">The date starts from this computer’s local date. Change it if the presentation took place on another day. Class size is a ceiling check, not a participation estimate.</p>${warning?`<div class="callout warning">${e(warning)}</div>`:''}<div class="actions">${b('Download JSON backup','json','','primary')}${b('Recover previous local save','recover')}${rawCorrupt?b('Download unreadable original data','raw-export'):''}</div><label class="label" for="import-file">Restore a downloaded Seismic Mission 3.0 backup</label><input type="file" id="import-file" accept=".json,application/json" class="file-input"><p class="small">Restoring replaces the current session only after a review step. Export your current session first if you need to keep both.</p><hr style="border:0;border-top:1px solid var(--line);margin:1.4rem 0"><h3>Presentation controls</h3><p class="small">Fit slide adjusts presentation content to the available screen. Turn it off for full-size text. Long forms and reports scroll within the content area; navigation stays in view.</p><div class="actions">${b(state.ui.fit?'Fit slide: on':'Fit slide: off','fit',`aria-pressed="${state.ui.fit}"`)}${b(state.ui.motion?'Motion on · click to reduce':'Motion off · click to enable','motion',`aria-pressed="${!state.ui.motion}"`)}${b('Keyboard shortcuts','shortcuts')}${b('Open original research','research')}${b('Download offline presentation','offline-download')}</div><p class="small">The standalone offline HTML contains the full application and research. Browser storage can depend on its file location; keep a JSON backup when moving it.</p><div class="actions">${b('Clear feedback & start a new class','reset-request','','danger ghost')}</div>`}
-  function openSession(){openModal('session','Session & data',sessionHtml())}
-  function openTeacher(){reviewing=false;openModal('teacher','Faculty evaluation',V.teacherForm(state,false))}
-  function reportModal(){openModal('report','Session evidence report',`<div class="actions" style="margin:0 0 1rem">${b('Print / Save as PDF','print','','primary')}${b('Download printable HTML','html-report')}${b('Download CSV','csv')}${b('Download JSON backup','json')}</div><style>${SM.report.css}</style>${SM.report.html(state)}`)}
-  function download(name,content,type){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
-  function filename(ext){return 'Seismic-Mission-'+state.session.date+'.'+ext}
-  function exportJson(){download(filename('json'),K.backup(state),'application/json');toast('JSON backup downloaded. Keep it to restore this session.')}
-  function printReport(){ $('print-report').innerHTML='<style>'+SM.report.css+'</style>'+SM.report.html(state);window.print() }
-  async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else throw Error('not supported')}catch{toast('Fullscreen is unavailable here. Use your browser’s fullscreen command instead.')}}
-  function showImport(candidate,source){pendingImport=candidate;pendingSource=source;openModal('import','Review session to restore',`<p class="lede">Restore this saved session on this computer?</p><div class="panel"><p><b>Date:</b> ${e(candidate.session.date)}</p><p><b>Class:</b> ${e(candidate.session.label||'Not entered')}</p><p><b>Spoken samples:</b> ${candidate.reflections.length}</p><p><b>Teacher evaluation:</b> ${e(candidate.teacher.status)}</p><p><b>Source:</b> ${e(source)}</p></div><p class="small">This replaces the active session. No data is uploaded. Download the current backup first if you want to retain both.</p><div class="actions">${b('Download current backup','json')}${b('Restore this session','import-confirm','','primary')}${b('Cancel','close-modal','','ghost')}</div>`)}
-  const actions={
-    next:()=>go(state.ui.slide+1),previous:()=>go(state.ui.slide-1),jump:d=>go(+d.value),
-    menu:()=>openModal('menu','Choose a chapter',`<p class="small">Jump freely. Votes, drafts, reflections and your class plan are preserved.</p><div class="menu-grid">${C.chapters.map((c,i)=>b(`${String(i+1).padStart(2,'0')} · ${c[0]}<span>${c[1]} · ${c[2]}</span>`,'jump',`data-value="${i}" ${state.ui.slide===i?'aria-current="step"':''}`)).join('')}</div><div class="actions">${b('Session & data','session')}${b('Teacher rubric','teacher')}${b('Research & sources','sources')}</div>`),
-    fit:()=>{state.ui.fit=!state.ui.fit;save();render();if(modalType==='session')replaceModal(sessionHtml())},
-    guide:()=>{state.ui.guide=!state.ui.guide;save();render()},session:openSession,teacher:openTeacher,report:reportModal,fullscreen,
-    'close-modal':closeModal,
-    shortcuts:()=>openModal('shortcuts','Keyboard shortcuts',`<table><tbody><tr><th>Next / Previous</th><td>→ / ← · Page Down / Page Up · Space = next</td></tr><tr><th>First / Last chapter</th><td>Home / End</td></tr><tr><th>Chapters</th><td>M</td></tr><tr><th>Fullscreen</th><td>F</td></tr><tr><th>Discussion guide</th><td>G</td></tr><tr><th>Teacher evaluation</th><td>E</td></tr><tr><th>Close dialog</th><td>Escape</td></tr></tbody></table><p class="small">Shortcuts pause while typing, using a button or inside a dialog. The timer never advances a chapter.</p>`),
-    sources:()=>openModal('sources','Research & source notes',`<p class="lede">The original project paper is the content baseline. The presentation uses qualitative findings and distinguishes observations from simplified diagrams.</p>${b('Read the complete original paper','research','','primary')}<p class="small">The paper is preserved unedited. Its numerical draft claims are not automatically validated by appearing here. The classroom presentation omits unsupported-looking damage multipliers and inspection counts.</p>${C.sources.filter(x=>x.url).map(x=>`<article class="mini-chart"><h3 style="font-size:.9rem"><a href="${e(x.url)}" target="_blank" rel="noopener noreferrer">${e(x.title)} ↗</a></h3><p class="small">${e(x.note)}</p></article>`).join('')}<p class="small">External source links require internet. The presentation, full project paper, diagrams and evaluation functions do not.</p>`),
-    research:()=>openModal('research','Original project research',`<p class="small">Preserved original text, including its bibliography. This is documentary research, not a report of our own fieldwork. See source notes for numerical and bibliography qualifications.</p><div class="actions">${b('Source notes','sources')}${b('Download research text','research-download')}</div><pre>${e(window.RESEARCH_TEXT||'Research text could not be loaded.')}</pre>`),
-    'research-download':()=>download('Seismic-Mission-original-research.md',window.RESEARCH_TEXT||'','text/markdown;charset=utf-8'),
-    vote:d=>{const error=K.setVote(state,d.id,+d.index,state.polls[d.id].counts[+d.index]+Number(d.delta));if(error)toast(error);save();render()},
-    'complete-poll':d=>{const error=K.completePoll(state,d.id);if(error)toast(error);else toast('Tally completed. You can correct counts at any time.');save();render()},
-    'skip-poll':d=>{state.polls[d.id].status='skipped';save();render();toast('Question skipped. Any draft counts remain saved.')},
-    'clear-poll':d=>openModal('clear-poll','Clear this tally?',`<p>${e(C.polls.find(p=>p.id===d.id).title)}</p><p class="small">Only this question’s counts, explanation and reveal state will be cleared.</p><div class="actions">${b('Clear this question','clear-poll-confirm',`data-id="${d.id}"`,'danger')}${b('Keep data','close-modal','','primary')}</div>`),
-    'clear-poll-confirm':d=>{const p=C.polls.find(x=>x.id===d.id);state.polls[d.id]={counts:p.options.map(()=>0),status:'not_started',revealed:false,reason:''};closeModal();save();render()},
-    'reveal-poll':d=>{const p=state.polls[d.id];if(!['completed','skipped'].includes(p.status))return toast('Complete or skip the tally before revealing.');p.revealed=!p.revealed;save();render()},
-    'lab-axis':d=>{state.ui.labAxis=d.value;state.ui.labRevealed=false;save();render()},
-    'lab-ground':d=>{state.ui.ground=d.value;state.ui.labRevealed=false;save();render()},
-    'lab-structure':d=>{state.ui.structure=d.value;state.ui.labRevealed=false;save();render()},
-    'lab-reveal':()=>{state.ui.labRevealed=true;save();render()},
-    'lab-static':()=>{state.ui.motion=false;state.ui.labRevealed=true;save();render();toast('Motion is off. The explanation is the same; you can re-enable motion in Session & data.')},
-    'liquid-step':d=>{state.ui.liquidStep=+d.value;save();render()},case:d=>{state.ui.case=d.value;save();render()},check:d=>{state.ui.check=+d.value;save();render()},
-    'next-check':()=>{state.ui.check=1;save();render(true)},
-    budget:d=>{const error=K.toggleBudget(state,d.id);if(error)toast(error);save();render()},
-    residents:()=>{if(!state.council.residents){state.council.before=[...state.council.selected];state.council.residents=true}save();render()},
-    'feedback-jump':d=>{state.ui.feedback=K.int(d.value,0,6);save();render()},
-    'feedback-prev':()=>{state.ui.feedback=Math.max(0,state.ui.feedback-1);save();render()},
-    'feedback-next':()=>{if(state.ui.feedback<6){state.ui.feedback++;save();render(true)}else go(11)},
-    'skip-feedback':()=>{V.feedbackIds.slice(state.ui.feedback).forEach(id=>{if(state.polls[id].status!=='completed')state.polls[id].status='skipped'});go(11)},
-    'add-reflection':()=>{const d=state.reflectionDraft;if(!d.text.trim())return toast('Record an actual spoken response before saving.');if(editingReflection<0&&state.reflections.length>=6)return toast('Six samples are already recorded. Edit or remove one to add another.');const r={...d,text:d.text.trim(),criteria:[...d.criteria],id:editingReflection>=0?state.reflections[editingReflection].id:K.uid()};if(editingReflection>=0)state.reflections[editingReflection]=r;else state.reflections.push(r);editingReflection=-1;state.reflectionDraft=reflectionEmpty();save();render();toast('Spoken sample and peer feedback saved.')},
-    'edit-reflection':d=>{const i=+d.index;if(!state.reflections[i])return;if(state.reflectionDraft.text.trim())return toast('Save or clear the current reflection draft before editing another sample.');editingReflection=i;state.reflectionDraft={...state.reflections[i],criteria:[...state.reflections[i].criteria]};state.ui.slide=11;save();render(true)},
-    'remove-reflection':d=>openModal('remove-reflection','Remove this spoken sample?',`<blockquote>${e(state.reflections[+d.index]?.text||'')}</blockquote><div class="actions">${b('Remove sample','remove-reflection-confirm',`data-index="${d.index}"`,'danger')}${b('Keep sample','close-modal','','primary')}</div>`),
-    'remove-reflection-confirm':d=>{state.reflections.splice(+d.index,1);if(editingReflection===+d.index)state.reflectionDraft=reflectionEmpty();editingReflection=state.reflections.findIndex(r=>r.id===state.reflectionDraft.id);closeModal();save();render()},
-    'clear-reflection-draft':()=>{state.reflectionDraft=reflectionEmpty();editingReflection=-1;save();render()},
-    'teacher-score':d=>{state.teacher.scores[d.id]=d.value==='na'?'na':+d.value;K.editTeacher(state);reviewing=false;save();replaceModal(V.teacherForm(state,false));render()},
-    'teacher-review':()=>{const error=K.reviewTeacher(state);if(error)return toast(error);reviewing=true;save();replaceModal(V.teacherForm(state,true));$('dialog').scrollTop=0;$('dialog-body').querySelector('button')?.focus()},
-    'teacher-edit':()=>{reviewing=false;replaceModal(V.teacherForm(state,false))},
-    'teacher-confirm':()=>{const error=K.confirmTeacher(state);if(error)return toast(error);save();closeModal();render();toast('Teacher evaluation confirmed. It remains editable.')},
-    motion:()=>{state.ui.motion=!state.ui.motion;save();render();if(modalType==='session')replaceModal(sessionHtml())},
-    'timer-toggle':()=>{if(state.timer===0)state.timer=timerDuration;running=!running;clock();save()},
-    'timer-reset':()=>{running=false;state.timer=timerDuration;save();clock()},
-    'timer-duration':()=>{running=false;timerDuration=timerDuration===30?60:timerDuration===60?180:30;state.timer=timerDuration;save();clock();toast('Discussion timer: '+timerDuration+' seconds.')},
-    json:exportJson,csv:()=>{download(filename('csv'),K.csv(state),'text/csv;charset=utf-8');toast('CSV exported with question status and sample sizes.')},
-    'html-report':()=>download(filename('html'),SM.report.document(state),'text/html;charset=utf-8'),print:printReport,
-    'raw-export':()=>download('Seismic-Mission-unreadable-data.txt',rawCorrupt||'','text/plain;charset=utf-8'),
-    recover:()=>{try{const raw=localStorage.getItem(K.BACKUP);if(!raw)return toast('No previous local save is available. Restore a downloaded JSON backup instead.');const result=K.parse(raw);if(result.blocked)return toast('The previous local save is also unreadable. It has not been changed.');showImport(result.state,'Previous local save')}catch{toast('This browser cannot read a previous save. Use a downloaded JSON backup.')}},
-    'import-confirm':()=>{if(!pendingImport)return;state=K.normalize(pendingImport);blocked=false;rawCorrupt=null;warning='';editingReflection=state.reflections.findIndex(r=>r.id===state.reflectionDraft.id);closeModal();save();render(true);toast('Session restored from '+pendingSource+'.')},
-    'reset-request':()=>openModal('reset','Start a new class',`<p class="lede">This clears version 3 feedback, evaluation, progress and its previous local save on this computer.</p><p class="small">Download a backup first if you need this session. Other applications and the preserved old versions are unaffected.</p><label class="label" for="reset-word">Type CLEAR to confirm</label><input id="reset-word" autocomplete="off" spellcheck="false"><div class="actions">${b('Download backup','json')}${b('Clear & start new class','reset-confirm','','danger')}${b('Cancel','close-modal','','primary')}</div>`),
-    'reset-confirm':()=>{if($('reset-word')?.value!=='CLEAR')return toast('Type CLEAR exactly to confirm.');try{localStorage.removeItem(K.KEY);localStorage.removeItem(K.BACKUP)}catch{storageFailed=true}state=K.create();blocked=false;rawCorrupt=null;warning='';editingReflection=-1;running=false;closeModal();save();render(true);toast('New empty session started.')},
-    'offline-download':()=>{if(location.protocol==='file:'&&document.querySelector('meta[name="seismic-standalone"]')){toast('You are already using the standalone offline file. Keep this file and a JSON backup.');return}const a=document.createElement('a');a.href='Seismic-Mission-offline.html';a.download='Seismic-Mission-offline.html';document.body.append(a);a.click();a.remove()}
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function defaultSurvival() {
+  return {
+    selectedIds: [],
+    remainingMs: MISSION.survivalConfig.timerDurationMs,
+    remainingSeconds: MISSION.survivalConfig.timerDurationSeconds,
+    timerStatus: 'idle',
+    phase: 'decision',
+    evaluated: false,
+    closingOpen: false
   };
-  document.addEventListener('click',event=>{const target=event.target.closest('[data-action]');if(!target||target.disabled)return;const fn=actions[target.dataset.action];if(fn){event.preventDefault();fn(target.dataset)}});
-  const fieldPaths=new Set(['session.label','session.date','session.size','council.reason','council.risk','council.equity','reflectionDraft.text','reflectionDraft.kind','reflectionDraft.peerStrength','reflectionDraft.peerNext','teacher.overall','teacher.strengths','teacher.improvements','teacher.comments','teacher.name','teacher.date']);
-  function updateField(target){const path=target.dataset.field;if(!fieldPaths.has(path))return;const [section,key]=path.split('.');let value=target.value;
-    if(key==='date'){if(!K.validDate(value)){if(target.tagName==='INPUT')target.value=state[section][key];return toast('Enter a valid calendar date.')}}
-    else if(path==='session.size'){value=value===''?null:K.int(value,1,500);for(const p of C.polls)if(value!==null&&K.sum(state.polls[p.id].counts)>value&&state.polls[p.id].status==='completed')state.polls[p.id].status='draft'}
-    else if(path==='teacher.overall')value=value===''?null:K.int(value,1,4);
-    else if(path==='reflectionDraft.kind')value=value==='application'?'application':'learning';
-    else value=K.text(value,key==='name'||key==='label'?80:key==='text'?700:key==='peerStrength'||key==='peerNext'?400:1200);
-    if(state[section][key]===value)return;
-    state[section][key]=value;
-    if(section==='teacher'){K.editTeacher(state);reviewing=false;const st=$('dialog-body').querySelector('.faculty-status');if(st)st.textContent='Draft · changes saved locally; review and confirm again.'}
-    save();
+}
+
+function defaults() {
+  return {
+    step: 0,
+    lang: 'es',
+    teacher: false,
+    vote: null,
+    case: 'loma',
+    soil: 'rock',
+    design: 'good',
+    labRuns: 0,
+    visited: ['loma'],
+    survival: defaultSurvival()
+  };
+}
+
+function sanitizeSurvival(raw) {
+  const base = defaultSurvival();
+  if (!raw || typeof raw !== 'object') return base;
+  const cfg = MISSION.survivalConfig;
+  const validIds = new Set(MISSION.options.map(o => o.id));
+  if (Array.isArray(raw.selectedIds)) {
+    base.selectedIds = [...new Set(raw.selectedIds.map(Number))]
+      .filter(id => Number.isInteger(id) && validIds.has(id))
+      .slice(0, cfg.maxDiscards);
   }
-  document.addEventListener('input',event=>{const t=event.target;if(t.dataset.field&&!['date','number'].includes(t.type)&&t.tagName!=='SELECT')updateField(t);if(t.dataset.pollReason){state.polls[t.dataset.pollReason].reason=K.text(t.value,600);save()}});
-  document.addEventListener('change',async event=>{const t=event.target;
-    if(t.dataset.field){updateField(t);if(t.dataset.field.startsWith('session.'))render()}
-    if(t.dataset.count){const error=K.setVote(state,t.dataset.count,+t.dataset.index,t.value);if(error)toast(error);t.value=String(state.polls[t.dataset.count].counts[+t.dataset.index]);save();if(!error){refreshPoll(t.dataset.count);layout.refresh()}}
-    if(t.dataset.observed!==undefined){state.reflectionDraft.criteria[+t.dataset.observed]=t.checked;save()}
-    if(t.id==='import-file'&&t.files?.[0]){const file=t.files[0];if(file.size>2_000_000)return toast('This file is too large for a classroom backup.');try{const raw=await file.text();const candidate=K.importBackup(raw);showImport(candidate,file.name)}catch(error){toast(error.message||'This backup could not be read. The current session is unchanged.')}}
-  });
-  document.addEventListener('keydown',event=>{if(event.altKey||event.ctrlKey||event.metaKey)return;
-    if($('dialog').open){if(event.key==='Escape'){event.preventDefault();closeModal()}if(event.key==='Tab'){const items=[...$('dialog').querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),textarea:not([disabled]),select:not([disabled]),summary,[tabindex="0"]')].filter(x=>!x.hidden);const first=items[0],last=items.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}}return}
-    if(event.target.closest('input,textarea,select,button,a,summary,[contenteditable="true"]'))return;
-    const key=event.key.toLowerCase(),map={arrowright:actions.next,pagedown:actions.next,' ':actions.next,arrowleft:actions.previous,pageup:actions.previous,home:()=>go(0),end:()=>go(C.chapters.length-1),f:fullscreen,e:openTeacher,g:actions.guide,m:actions.menu};if(map[key]){event.preventDefault();map[key]()}
-  });
-  $('dialog').addEventListener('cancel',event=>{event.preventDefault();closeModal()});
-  document.addEventListener('fullscreenchange',()=>{$('full-button').textContent=document.fullscreenElement?'Exit fullscreen':'Fullscreen'});
-  window.addEventListener('beforeprint',()=>{$('print-report').innerHTML='<style>'+SM.report.css+'</style>'+SM.report.html(state)});
-  window.addEventListener('beforeunload',event=>{if(storageFailed||blocked){event.preventDefault();event.returnValue=''}});
-  window.addEventListener('storage',event=>{if(event.key===K.KEY&&event.newValue&&event.newValue!==JSON.stringify(state)){blocked=true;warning='This session changed in another tab. Export this tab’s backup, then reload to use the other saved version. Saving here is paused to avoid overwriting it.';storageStatus()}});
-  setInterval(()=>{if(!running)return;if(state.timer>0){state.timer--;clock();save()}if(state.timer===0){running=false;clock();toast('Discussion time is up. Hear a response when the class is ready.')}},1000);
-  SM.app={get state(){return state},go,render,actions,save,get blocked(){return blocked}};
+  if (typeof raw.remainingMs === 'number' && Number.isFinite(raw.remainingMs)) {
+    base.remainingMs = Math.max(0, Math.min(cfg.timerDurationMs, Math.round(raw.remainingMs)));
+  } else if (typeof raw.remainingSeconds === 'number' && Number.isFinite(raw.remainingSeconds)) {
+    const clampedSec = Math.max(0, Math.min(cfg.timerDurationSeconds, Math.round(raw.remainingSeconds)));
+    base.remainingMs = clampedSec * 1000;
+  }
+  base.remainingSeconds = Math.max(0, Math.min(cfg.timerDurationSeconds, Math.ceil(base.remainingMs / 1000)));
+  if (base.remainingMs <= 0) {
+    base.remainingMs = 0;
+    base.remainingSeconds = 0;
+    base.timerStatus = 'expired';
+  } else if (raw.timerStatus === 'expired') {
+    base.remainingMs = 0;
+    base.remainingSeconds = 0;
+    base.timerStatus = 'expired';
+  } else if ((raw.timerStatus === 'paused' || raw.timerStatus === 'running') && base.remainingMs < cfg.timerDurationMs) {
+    base.timerStatus = 'paused';
+  } else {
+    base.timerStatus = 'idle';
+  }
+  base.evaluated = raw.evaluated === true;
+  base.closingOpen = raw.closingOpen === true;
+  if (base.closingOpen) {
+    base.phase = 'closing';
+  } else if (['decision', 'validation', 'simulation', 'closing'].includes(raw.phase)) {
+    base.phase = raw.phase === 'closing' ? 'simulation' : raw.phase;
+  } else {
+    base.phase = base.evaluated ? 'validation' : 'decision';
+  }
+  return base;
+}
+
+let state = defaults(), storageAvailable = true;
+try {
+  const x = JSON.parse(localStorage.getItem('seismic-mission-v1') || 'null');
+  if (x && typeof x === 'object') {
+    state.step = Number.isInteger(x.step) && x.step >= 0 && x.step < 7 ? x.step : 0;
+    state.lang = x.lang === 'en' ? 'en' : 'es';
+    state.teacher = x.teacher === true;
+    state.vote = ['a', 'b', 'c'].includes(x.vote) ? x.vote : null;
+    state.case = x.case === 'christchurch' ? 'christchurch' : 'loma';
+    state.soil = ['rock', 'soft', 'wet'].includes(x.soil) ? x.soil : 'rock';
+    state.design = x.design === 'weak' ? 'weak' : 'good';
+    state.labRuns = Number.isInteger(x.labRuns) && x.labRuns >= 0 ? x.labRuns : 0;
+    state.visited = Array.isArray(x.visited) ? x.visited.filter(v => ['loma', 'christchurch'].includes(v)) : ['loma'];
+    if (state.visited.length === 0) state.visited = ['loma'];
+    state.survival = sanitizeSurvival(x.survival);
+  }
+} catch {
+  storageAvailable = false;
+}
+
+function tr(es, en) { return state.lang === 'es' ? es : en; }
+function t(pair) { return pair[state.lang === 'es' ? 0 : 1]; }
+const box = (c, x) => '<div class="' + c + '">' + x + '</div>';
+const p = (x, c = '') => '<p' + (c ? ' class="' + c + '"' : '') + '>' + x + '</p>';
+const h = x => '<h3>' + x + '</h3>';
+function btn(label, action, cls = '', extra = '') {
+  return '<button type="button"' + (cls ? ' class="' + cls + '"' : '') + (extra ? ' ' + extra : '') + ' onclick="' + action + '">' + label + '</button>';
+}
+function detail(title, body) { return '<details><summary>' + title + '</summary>' + p(body) + '</details>'; }
+function head(label, title, body = '') {
+  return box('eyebrow', label) + '<h2 tabindex="-1" id="pageTitle">' + title + '</h2>' + (body ? p(body, 'lede') : '');
+}
+function save() {
+  try { localStorage.setItem('seismic-mission-v1', JSON.stringify(state)); } catch { storageAvailable = false; }
+}
+
+let toastTimeout, labTimeout, modalFocus;
+let survivalTimerId = null;
+let survivalDeadlineMs = 0;
+
+function nowMs() {
+  return Date.now();
+}
+
+function stopSurvivalInterval() {
+  if (survivalTimerId !== null) {
+    if (typeof clearInterval === 'function') clearInterval(survivalTimerId);
+    survivalTimerId = null;
+  }
+}
+
+function formatSurvivalClock(seconds = state.survival.remainingSeconds) {
+  const safe = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
+  return '00:' + String(safe).padStart(2, '0');
+}
+
+function isDecisionLocked(session = state.survival) {
+  return Boolean(session.evaluated || session.timerStatus === 'expired');
+}
+
+function canEvaluatePlan(session = state.survival) {
+  return Boolean(
+    session.evaluated ||
+    session.selectedIds.length === MISSION.survivalConfig.maxDiscards ||
+    session.timerStatus === 'expired'
+  );
+}
+
+function getTimerVisualMeta(session = state.survival) {
+  const cfg = MISSION.survivalConfig;
+  const pct = Math.max(0, Math.min(100, (session.remainingMs / cfg.timerDurationMs) * 100));
+  const isExpired = session.timerStatus === 'expired' || session.remainingSeconds <= 0;
+  const isWarning = !isExpired && session.remainingSeconds <= cfg.warningThresholdSeconds;
+  let stateClass = 'is-normal';
+  let statusText = tr('Detenido · Listo para iniciar', 'Stopped · Ready to start');
+  if (session.evaluated) {
+    stateClass = 'is-locked';
+    statusText = tr('Evaluación confirmada · Decisiones bloqueadas', 'Evaluation confirmed · Decisions locked');
+  } else if (isExpired) {
+    stateClass = 'is-expired';
+    statusText = tr('Tiempo agotado · Selecciones bloqueadas', 'Time expired · Selections locked');
+  } else if (session.timerStatus === 'running' && isWarning) {
+    stateClass = 'is-warning';
+    statusText = tr('⚠ Últimos 10 segundos · Cierren descartes', '⚠ Final 10 seconds · Lock in discards');
+  } else if (session.timerStatus === 'running') {
+    stateClass = 'is-running';
+    statusText = tr('Cuenta regresiva en curso', 'Countdown running');
+  } else if (session.timerStatus === 'paused') {
+    stateClass = isWarning ? 'is-warning' : 'is-paused';
+    statusText = tr('En pausa · Podés reanudar', 'Paused · Ready to resume');
+  }
+  return { pct, isExpired, isWarning, stateClass, statusText };
+}
+
+function syncTimerDOM() {
+  const clockEl = $('#srClock');
+  const barEl = $('#srTimerBar');
+  const trackEl = $('#srTimerTrack');
+  const boxEl = $('#srTimerBox');
+  const statusEl = $('#srTimerStatus');
+  const meta = getTimerVisualMeta(state.survival);
+  if (clockEl) clockEl.textContent = formatSurvivalClock(state.survival.remainingSeconds);
+  if (barEl && barEl.style) barEl.style.width = meta.pct.toFixed(1) + '%';
+  if (trackEl && trackEl.setAttribute) trackEl.setAttribute('aria-valuenow', String(state.survival.remainingSeconds));
+  if (statusEl) statusEl.textContent = meta.statusText;
+  if (boxEl) boxEl.className = 'sr-timer panel ' + meta.stateClass;
+}
+
+function survivalTick() {
+  if (state.survival.timerStatus !== 'running' || state.step !== 4) {
+    pauseSurvivalTimer(true);
+    return;
+  }
+  const cfg = MISSION.survivalConfig;
+  const remMs = Math.max(0, survivalDeadlineMs - nowMs());
+  const remSec = Math.max(0, Math.min(cfg.timerDurationSeconds, Math.ceil(remMs / 1000)));
+  state.survival.remainingMs = remMs;
+  state.survival.remainingSeconds = remSec;
+  if (remMs <= 0) {
+    stopSurvivalInterval();
+    state.survival.remainingMs = 0;
+    state.survival.remainingSeconds = 0;
+    state.survival.timerStatus = 'expired';
+    save();
+    toast(tr('Tiempo agotado. Selecciones bloqueadas: ya se puede evaluar el plan.', 'Time is up. Selections locked: you may now evaluate the plan.'));
+    render();
+    return;
+  }
+  syncTimerDOM();
+}
+
+function timerStart() {
+  if (state.step !== 4) return false;
+  if (isDecisionLocked()) return false;
+  if (state.survival.timerStatus === 'running') return false;
+  if (state.survival.remainingMs <= 0) return false;
+  stopSurvivalInterval();
+  survivalDeadlineMs = nowMs() + state.survival.remainingMs;
+  state.survival.timerStatus = 'running';
+  save();
   render();
-})();
+  survivalTimerId = setInterval(survivalTick, MISSION.survivalConfig.timerTickMs);
+  return true;
+}
+
+function pauseSurvivalTimer(silent = false) {
+  if (state.survival.timerStatus !== 'running') {
+    stopSurvivalInterval();
+    return false;
+  }
+  const cfg = MISSION.survivalConfig;
+  const remMs = Math.max(0, survivalDeadlineMs - nowMs());
+  stopSurvivalInterval();
+  if (remMs <= 0) {
+    state.survival.remainingMs = 0;
+    state.survival.remainingSeconds = 0;
+    state.survival.timerStatus = 'expired';
+  } else {
+    state.survival.remainingMs = remMs;
+    state.survival.remainingSeconds = Math.max(0, Math.min(cfg.timerDurationSeconds, Math.ceil(remMs / 1000)));
+    state.survival.timerStatus = 'paused';
+  }
+  save();
+  if (!silent) render();
+  return true;
+}
+
+function timerPause() {
+  return pauseSurvivalTimer(false);
+}
+
+function timerReset(goDecision = false) {
+  stopSurvivalInterval();
+  survivalDeadlineMs = 0;
+  state.survival = defaultSurvival();
+  save();
+  if (goDecision && state.step !== 4) go(4);
+  else render();
+  return true;
+}
+
+function toggleDiscard(id, viaKeyboard = false) {
+  const numId = Number(id);
+  const option = MISSION.options.find(o => o.id === numId);
+  if (!option) return false;
+  if (isDecisionLocked()) return false;
+
+  if (state.survival.timerStatus === 'running') {
+    const cfg = MISSION.survivalConfig;
+    const remMs = Math.max(0, survivalDeadlineMs - nowMs());
+    state.survival.remainingMs = remMs;
+    state.survival.remainingSeconds = Math.max(0, Math.min(cfg.timerDurationSeconds, Math.ceil(remMs / 1000)));
+    if (remMs <= 0) {
+      stopSurvivalInterval();
+      state.survival.timerStatus = 'expired';
+      save();
+      render();
+      return false;
+    }
+  }
+
+  const current = state.survival.selectedIds;
+  if (current.includes(numId)) {
+    state.survival.selectedIds = current.filter(x => x !== numId);
+  } else {
+    if (current.length >= MISSION.survivalConfig.maxDiscards) {
+      toast(tr('Solo se permiten 2 descartes. Desmarcá una opción si querés cambiarla.', 'Maximum of 2 discards allowed. Deselect an option to change it.'));
+      return false;
+    }
+    state.survival.selectedIds = [...current, numId];
+  }
+  save();
+  render();
+  if (viaKeyboard) $('#srCard-' + numId)?.focus({ preventScroll: true });
+  return true;
+}
+
+/* --- Pure Evaluation & Resilience Domain Logic (DOM-independent) --- */
+
+function classifyOptionDecision(realType, decision) {
+  if (realType === 'trap' && decision === 'discarded') {
+    return {
+      outcome: 'neutralized',
+      tone: 'neutralized',
+      icon: '✓',
+      badge: ['NEUTRALIZADA', 'NEUTRALIZED'],
+      result: ['Neutralizada', 'Neutralized']
+    };
+  }
+  if (realType === 'trap' && decision === 'retained') {
+    return {
+      outcome: 'active_trap',
+      tone: 'active-trap',
+      icon: '⚠',
+      badge: ['TRAMPA ACTIVA', 'ACTIVE TRAP'],
+      result: ['Trampa activa: riesgo residual', 'Active trap: residual risk']
+    };
+  }
+  if (realType === 'valid' && decision === 'retained') {
+    return {
+      outcome: 'conserved',
+      tone: 'conserved',
+      icon: '●',
+      badge: ['MEDIDA CONSERVADA', 'MEASURE CONSERVED'],
+      result: ['Medida vital conservada', 'Vital measure conserved']
+    };
+  }
+  return {
+    outcome: 'critical_error',
+    tone: 'critical-error',
+    icon: '✕',
+    badge: ['ERROR CRÍTICO', 'CRITICAL ERROR'],
+    result: ['Error crítico: medida vital omitida', 'Critical error: vital measure omitted']
+  };
+}
+
+function evaluateSurvivalPlan(selectedIds = state.survival.selectedIds) {
+  const validOptionIds = new Set(MISSION.options.map(o => o.id));
+  const cleanDiscards = Array.isArray(selectedIds)
+    ? [...new Set(selectedIds.map(Number))].filter(id => validOptionIds.has(id)).sort((a, b) => a - b)
+    : [];
+  const discardedSet = new Set(cleanDiscards);
+
+  const items = MISSION.options.map(option => {
+    const decision = discardedSet.has(option.id) ? 'discarded' : 'retained';
+    const meta = classifyOptionDecision(option.type, decision);
+    return {
+      id: option.id,
+      indicatorKey: option.indicatorKey,
+      realType: option.type,
+      decision,
+      outcome: meta.outcome,
+      tone: meta.tone,
+      icon: meta.icon,
+      title: option.title,
+      statement: option.statement,
+      decisionLabel: decision === 'discarded'
+        ? ['Descartada por el equipo', 'Discarded by team']
+        : ['No descartada (conservada)', 'Not discarded (retained)'],
+      realClassLabel: option.type === 'valid'
+        ? ['Medida preventiva válida', 'Valid preventive measure']
+        : ['Trampa técnica / mito ineficaz', 'Technical trap / ineffective myth'],
+      badge: meta.badge,
+      result: meta.result,
+      explanation: decision === 'discarded' ? option.validation.discarded : option.validation.retained,
+      simulationData: option.simulation
+    };
+  });
+
+  return {
+    selectedIds: cleanDiscards,
+    discardCount: cleanDiscards.length,
+    items,
+    conserved: items.filter(i => i.outcome === 'conserved'),
+    neutralized: items.filter(i => i.outcome === 'neutralized'),
+    criticalErrors: items.filter(i => i.outcome === 'critical_error'),
+    activeTraps: items.filter(i => i.outcome === 'active_trap')
+  };
+}
+
+function calculateResilience(evaluationOrSelectedIds = state.survival.selectedIds) {
+  const evaluation = evaluationOrSelectedIds && Array.isArray(evaluationOrSelectedIds.items)
+    ? evaluationOrSelectedIds
+    : evaluateSurvivalPlan(evaluationOrSelectedIds);
+  const cfg = MISSION.survivalConfig;
+  const validRetained = evaluation.conserved.length;
+  const trapsDiscarded = evaluation.neutralized.length;
+  const rawScore = (cfg.validKeepPoints * validRetained) + (cfg.trapDiscardPoints * trapsDiscarded);
+  const score = Math.round(rawScore);
+
+  let level = 'critical';
+  let label = ['CRÍTICO', 'CRITICAL'];
+  if (rawScore >= cfg.optimalMinScore) {
+    level = 'optimal';
+    label = ['ÓPTIMO', 'OPTIMAL'];
+  } else if (rawScore >= cfg.compromisedMinScore) {
+    level = 'compromised';
+    label = ['COMPROMETIDO', 'COMPROMISED'];
+  }
+
+  return {
+    validRetained,
+    trapsDiscarded,
+    rawScore,
+    score,
+    level,
+    label
+  };
+}
+
+function buildDynamicConclusion(evaluation, resilience) {
+  const v = resilience.validRetained;
+  const n = resilience.trapsDiscarded;
+  const errs = evaluation.criticalErrors;
+  const traps = evaluation.activeTraps;
+
+  if (v === 3 && n === 2) {
+    return [
+      'Acierto pleno: el equipo conservó las tres barreras de ingeniería y planificación territorial y neutralizó ambos mitos operativos, logrando la máxima resiliencia del escenario.',
+      'Full accuracy: the team preserved all three engineering and land-use safeguards while neutralizing both operational myths, achieving peak scenario resilience.'
+    ];
+  }
+  if (v === 3 && n === 1) {
+    const remTrap = traps[0];
+    return [
+      'Buen criterio estructural: se protegieron las tres medidas vitales, pero permaneció activa una trampa (' + remTrap.title[0] + '), dejando un riesgo conductual o de evacuación evitable.',
+      'Strong structural judgement: all three vital measures were preserved, but one trap remained active (' + remTrap.title[1] + '), leaving an avoidable behavioural or evacuation risk.'
+    ];
+  }
+  if (v === 3 && n === 0) {
+    return [
+      'Infraestructura conservada con riesgo conductual: no se descartaron medidas válidas, pero ambas trampas sísmicas quedaron activas en el protocolo de contingencia.',
+      'Infrastructure preserved with behavioural risk: no valid measures were lost, yet both seismic traps stayed active in the contingency protocol.'
+    ];
+  }
+  if (v === 2 && n === 1) {
+    const lost = errs[0];
+    const remTrap = traps[0];
+    return [
+      'Plan comprometido: se neutralizó una trampa, pero se descartó por error una medida vital (' + lost.title[0] + ') y siguió activa otra trampa (' + remTrap.title[0] + ').',
+      'Compromised plan: one trap was neutralized, but a vital measure was mistakenly discarded (' + lost.title[1] + ') and another trap stayed active (' + remTrap.title[1] + ').'
+    ];
+  }
+  if (v === 2 && n === 2) {
+    const lost = errs[0];
+    return [
+      'Trampas neutralizadas con costo preventivo: se eliminaron los mitos, pero se omitió una medida vital (' + lost.title[0] + ').',
+      'Traps neutralized with preventive loss: myths were removed, but one vital measure was omitted (' + lost.title[1] + ').'
+    ];
+  }
+  if (v === 2 && n === 0) {
+    const lost = errs[0];
+    return [
+      'Plan vulnerable: se perdió una medida preventiva vital (' + lost.title[0] + ') sin lograr descartar ninguna de las dos trampas sísmicas.',
+      'Vulnerable plan: a vital preventive measure (' + lost.title[1] + ') was lost without discarding either seismic trap.'
+    ];
+  }
+  return [
+    'Plan en estado crítico: se descartaron medidas preventivas esenciales (' + errs.map(e => e.title[0]).join(', ') + ') debilitando de forma severa la capacidad de respuesta urbana ante el sismo.',
+    'Plan in critical condition: essential preventive measures were discarded (' + errs.map(e => e.title[1]).join(', ') + '), severely weakening urban seismic resilience.'
+  ];
+}
+
+function buildSimulationSummary(selectedIds = state.survival.selectedIds) {
+  const evaluation = evaluateSurvivalPlan(selectedIds);
+  const resilience = calculateResilience(evaluation);
+  const byKey = Object.fromEntries(evaluation.items.map(item => [item.indicatorKey, item]));
+
+  const hospitalItem = byKey.hospital;
+  const gasItem = byKey.gasValves;
+  const elevatorItem = byKey.elevators;
+  const zoningItem = byKey.zoning;
+  const doorMythItem = byKey.doorMyth;
+
+  const indicators = [
+    {
+      code: 'A',
+      key: 'hospitalIntegrity',
+      sourceOptionId: hospitalItem.id,
+      title: ['A. Integridad hospitalaria', 'A. Hospital integrity'],
+      favorable: hospitalItem.decision === 'retained',
+      status: hospitalItem.decision === 'retained' ? hospitalItem.simulationData.retainedStatus : hospitalItem.simulationData.discardedStatus,
+      detail: hospitalItem.decision === 'retained' ? hospitalItem.simulationData.retainedDetail : hospitalItem.simulationData.discardedDetail
+    },
+    {
+      code: 'B',
+      key: 'secondaryFireRisk',
+      sourceOptionId: gasItem.id,
+      title: ['B. Riesgo de incendios secundarios', 'B. Secondary fire risk'],
+      favorable: gasItem.decision === 'retained',
+      status: gasItem.decision === 'retained' ? gasItem.simulationData.retainedStatus : gasItem.simulationData.discardedStatus,
+      detail: gasItem.decision === 'retained' ? gasItem.simulationData.retainedDetail : gasItem.simulationData.discardedDetail
+    },
+    {
+      code: 'C',
+      key: 'evacuationInjuryRisk',
+      sourceOptionId: elevatorItem.id,
+      title: ['C. Riesgo de lesiones por evacuación', 'C. Evacuation injury risk'],
+      favorable: elevatorItem.decision === 'discarded',
+      status: elevatorItem.decision === 'discarded' ? elevatorItem.simulationData.discardedStatus : elevatorItem.simulationData.retainedStatus,
+      detail: elevatorItem.decision === 'discarded' ? elevatorItem.simulationData.discardedDetail : elevatorItem.simulationData.retainedDetail
+    },
+    {
+      code: 'D',
+      key: 'geotechnicalRisk',
+      sourceOptionId: zoningItem.id,
+      title: ['D. Riesgo geotécnico y estructural', 'D. Geotechnical and structural risk'],
+      favorable: zoningItem.decision === 'retained',
+      status: zoningItem.decision === 'retained' ? zoningItem.simulationData.retainedStatus : zoningItem.simulationData.discardedStatus,
+      detail: zoningItem.decision === 'retained' ? zoningItem.simulationData.retainedDetail : zoningItem.simulationData.discardedDetail
+    }
+  ];
+
+  const doorFrameBehavioralRisk = {
+    key: 'doorFrameMythRisk',
+    sourceOptionId: doorMythItem.id,
+    title: [
+      'Conducta y refugio interior · Mito de los marcos de puertas',
+      'Behaviour and interior shelter · Doorway myth'
+    ],
+    favorable: doorMythItem.decision === 'discarded',
+    status: doorMythItem.decision === 'discarded' ? doorMythItem.simulationData.discardedStatus : doorMythItem.simulationData.retainedStatus,
+    detail: doorMythItem.decision === 'discarded' ? doorMythItem.simulationData.discardedDetail : doorMythItem.simulationData.retainedDetail
+  };
+
+  return {
+    evaluation,
+    resilience,
+    indicators,
+    doorFrameBehavioralRisk,
+    conclusion: buildDynamicConclusion(evaluation, resilience)
+  };
+}
+
+/* --- Phase Transitions & Navigation --- */
+
+function confirmEvaluation() {
+  if (!canEvaluatePlan()) return false;
+  if (state.survival.timerStatus === 'running') {
+    pauseSurvivalTimer(true);
+  }
+  stopSurvivalInterval();
+  state.survival.evaluated = true;
+  state.survival.closingOpen = false;
+  state.survival.phase = 'validation';
+  save();
+  go(5);
+  return true;
+}
+
+function advanceToSimulation() {
+  if (state.survival.timerStatus === 'running') {
+    pauseSurvivalTimer(true);
+  }
+  stopSurvivalInterval();
+  state.survival.evaluated = true;
+  state.survival.phase = state.survival.closingOpen ? 'closing' : 'simulation';
+  save();
+  go(6);
+  return true;
+}
+
+function focusClosingSection() {
+  const heading = $('#closingTitle');
+  const section = $('#cierre');
+  heading?.focus({ preventScroll: true });
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (section && typeof section.scrollIntoView === 'function') {
+    section.scrollIntoView({ behavior: reduceMotion ? 'instant' : 'smooth', block: 'start' });
+  }
+}
+
+function continueToClosing(fromShortcut = false) {
+  if (state.step !== 6) return false;
+  if (state.survival.closingOpen) {
+    if (fromShortcut) return false;
+    focusClosingSection();
+    return true;
+  }
+  state.survival.evaluated = true;
+  state.survival.closingOpen = true;
+  state.survival.phase = 'closing';
+  save();
+  render();
+  focusClosingSection();
+  return true;
+}
+
+function toast(text) {
+  clearTimeout(toastTimeout);
+  $('#toast').textContent = text;
+  $('#toast').classList.remove('hidden');
+  toastTimeout = setTimeout(() => $('#toast').classList.add('hidden'), 3500);
+}
+
+function go(n) {
+  const next = Math.max(0, Math.min(6, n));
+  if (state.step === 4 && next !== 4 && state.survival.timerStatus === 'running') {
+    pauseSurvivalTimer(true);
+  }
+  state.step = next;
+  save();
+  render();
+  $('#pageTitle')?.focus({ preventScroll: true });
+  window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+}
+
+function footer() {
+  let nextBtn = '<button type="button" class="primary" onclick="go(' + (state.step + 1) + ')" ' + (state.step === 6 ? 'disabled' : '') + '>' + tr('Continuar', 'Continue') + ' →</button>';
+  if (state.step === 4) {
+    nextBtn = '<button type="button" class="primary" onclick="confirmEvaluation()" ' + (!canEvaluatePlan() ? 'disabled' : '') + '>' + tr('Evaluar Plan Sísmico', 'Evaluate Seismic Plan') + ' →</button>';
+  } else if (state.step === 5) {
+    nextBtn = '<button type="button" class="primary" onclick="advanceToSimulation()">' + tr('Ejecutar Simulación de Impacto', 'Run Impact Simulation') + ' →</button>';
+  } else if (state.step === 6) {
+    nextBtn = '<button type="button" class="primary" onclick="continueToClosing()" ' + (state.survival.closingOpen ? 'disabled' : '') + '>' + tr('Continuar con el cierre', 'Continue to closing') + ' →</button>';
+  }
+  return '<div class="footer"><button type="button" onclick="go(' + (state.step - 1) + ')" ' + (state.step === 0 ? 'disabled' : '') + '>' + tr('Anterior', 'Back') + '</button><span>' + (state.step + 1) + ' / 7 · ' + tr('Decisiones compartidas', 'Shared decisions') + '</span>' + nextBtn + '</div>';
+}
+
+function teacher() {
+  return state.teacher ? '<aside class="teacher">' + h(tr('Para vos, que coordinás', 'Presenter prompt')) + p(t(MISSION.prompts[state.step])) + '</aside>' : '';
+}
+
+function render() {
+  clearTimeout(labTimeout);
+  document.documentElement.lang = state.lang;
+  $('#lang').textContent = state.lang === 'es' ? 'EN' : 'ES';
+  $('#teacher').textContent = tr(state.teacher ? 'Ocultar guía' : 'Modo docente', state.teacher ? 'Hide guide' : 'Presenter mode');
+  $('#teacher').setAttribute('aria-pressed', String(state.teacher));
+  $('#sources').textContent = tr('Fuentes', 'Sources');
+  $('#nav').innerHTML = MISSION.labels.map((label, i) => '<button type="button" class="' + (i === state.step ? 'active' : '') + '" onclick="go(' + i + ')" ' + (i === state.step ? 'aria-current="step"' : '') + '><small>0' + (i + 1) + '</small>' + t(label) + '</button>').join('') + box('navfoot', 'CLASSROOM EDITION<br>25–35 MIN<br>' + tr('Un proyector.<br>Todo el curso decide.', 'One projector.<br>The whole class decides.'));
+  $('#progress').style.width = (state.step + 1) / 7 * 100 + '%';
+  $('#main').innerHTML = pages[state.step]() + teacher() + footer();
+  bind();
+}
+
+function vote(v) { state.vote = v; save(); render(); }
+function setCase(id) { state.case = id; state.visited = [...new Set([...state.visited, id])]; save(); render(); }
+
+function bind() {
+  if ($('#soil')) {
+    $('#soil').value = state.soil;
+    $('#design').value = state.design;
+    $('#soil').onchange = e => { state.soil = e.target.value; save(); render(); };
+    $('#design').onchange = e => { state.design = e.target.value; save(); render(); };
+    $('#run').onclick = lab;
+  }
+}
+
+function reportText() {
+  const sim = buildSimulationSummary();
+  const ev = sim.evaluation;
+  const res = sim.resilience;
+  const lines = [
+    'SEISMIC MISSION 3.0 · SURVIVAL RUN',
+    new Date().toLocaleDateString(),
+    '',
+    tr('Descartes seleccionados', 'Selected discards') + ': ' + ev.discardCount + '/' + MISSION.survivalConfig.maxDiscards,
+    tr('Índice didáctico de resiliencia urbana', 'Didactic urban resilience index') + ': ' + res.score + '% (' + t(res.label) + ')',
+    tr('Nota metodológica: índice formativo basado en las decisiones tomadas; no constituye una predicción científica real de daños o víctimas.', 'Methodological note: educational index based on decisions made; not a real scientific prediction of damage or casualties.'),
+    '',
+    tr('VALIDACIÓN DE LAS CINCO MEDIDAS', 'VALIDATION OF THE FIVE MEASURES'),
+    ...ev.items.map(item =>
+      '- [' + t(item.badge) + '] ' + tr('Opción ', 'Option ') + item.id + ' — ' + t(item.title) +
+      ' | ' + t(item.decisionLabel) + ' | ' + t(item.realClassLabel) + '\n  ' + t(item.explanation)
+    ),
+    '',
+    tr('SIMULACIÓN POSTEVENTO', 'POST-EVENT SIMULATION'),
+    ...sim.indicators.map(ind => '- ' + t(ind.title) + ': ' + t(ind.status) + ' — ' + t(ind.detail)),
+    '- ' + t(sim.doorFrameBehavioralRisk.title) + ': ' + t(sim.doorFrameBehavioralRisk.status) + ' — ' + t(sim.doorFrameBehavioralRisk.detail),
+    '',
+    tr('Conclusión', 'Conclusion') + ': ' + t(sim.conclusion),
+    '',
+    'SOURCES',
+    MISSION.sources.map(x => x.join('\n')).join('\n\n')
+  ];
+  return lines.join('\n');
+}
+
+function downloadReport() {
+  const a = document.createElement('a');
+  const u = URL.createObjectURL(new Blob([reportText()], { type: 'text/plain;charset=utf-8' }));
+  a.href = u;
+  a.download = 'seismic-mission-report.txt';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 1500);
+}
+
+function resetMission() {
+  if (confirm(tr('¿Borrar las decisiones y empezar otra clase?', 'Clear decisions and start a new class?'))) {
+    stopSurvivalInterval();
+    survivalDeadlineMs = 0;
+    const lang = state.lang, teacherMode = state.teacher;
+    state = { ...defaults(), lang, teacher: teacherMode };
+    save();
+    go(0);
+  }
+}
+
+function modal(html) {
+  if ($('#modal').classList.contains('hidden')) modalFocus = document.activeElement;
+  $('#modalBody').innerHTML = html;
+  $('#modal').classList.remove('hidden');
+  document.querySelector('header').inert = true;
+  document.querySelector('.shell').inert = true;
+  $('#close').focus();
+}
+
+function closeModal() {
+  $('#modal').classList.add('hidden');
+  document.querySelector('header').inert = false;
+  document.querySelector('.shell').inert = false;
+  if (modalFocus?.isConnected) modalFocus.focus();
+}
+
+function openPaper() {
+  modal('<h2>' + tr('Investigación original', 'Original research') + '</h2>' + p(tr('Texto de trabajo en inglés. Las cifras del borrador no reciben validación adicional por aparecer aquí. La misión principal utiliza las conclusiones cualitativas.', 'English working paper. Inclusion here does not independently validate the draft’s figures. The main mission uses the qualitative conclusions.')) + '<pre id="paperText"></pre>');
+  $('#paperText').textContent = window.RESEARCH_TEXT || tr('No se pudo cargar el texto.', 'The text could not be loaded.');
+}
+
+function openSources() {
+  modal('<h2>' + tr('La evidencia detrás de la misión', 'Evidence behind the mission') + '</h2>' + p(tr('Los expedientes son reales. El escenario de simulación es didáctico. Las animaciones y puntajes son explicativos y no predicen daños reales.', 'The case studies are real. The simulation scenario is educational. Animations and scores are explanatory and do not predict real damage.')) + MISSION.sources.map(([name, url]) => p('<a href="' + url + '" target="_blank" rel="noopener">' + name + ' ↗</a>')).join('') + btn(tr('Leer el trabajo completo', 'Read the complete paper'), 'openPaper()'));
+}
+
+$('#close').onclick = closeModal;
+$('#modal').addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Tab') {
+    const items = [...$('#modal').querySelectorAll('button,a,[tabindex="0"]')];
+    if (items.length === 0) return;
+    if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1).focus(); }
+    else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0].focus(); }
+  }
+});
+$('#sources').onclick = openSources;
+$('#lang').onclick = () => { state.lang = state.lang === 'es' ? 'en' : 'es'; save(); render(); };
+$('#teacher').onclick = () => { state.teacher = !state.teacher; save(); render(); };
+$('#full').onclick = async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch {
+    toast(tr('Este navegador no permite pantalla completa aquí.', 'Fullscreen is unavailable here.'));
+  }
+};
+
+function handleGlobalKeydown(e) {
+  if (e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (!$('#modal').classList.contains('hidden')) return;
+  const target = e.target || {};
+  const tag = String(target.tagName || '').toUpperCase();
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || target.isContentEditable) return;
+
+  if (state.step === 4 && ['1', '2', '3', '4', '5'].includes(e.key)) {
+    e.preventDefault();
+    toggleDiscard(Number(e.key), false);
+    $('#pageTitle')?.focus({ preventScroll: true });
+    return;
+  }
+
+  const interactiveControl = ['BUTTON', 'SUMMARY', 'A'].includes(tag) || Boolean(target.closest && target.closest('button,summary,a'));
+  if (interactiveControl) return;
+
+  if (e.code === 'Space' || e.key === ' ') {
+    if (state.step === 4) {
+      if (!state.survival.evaluated && state.survival.selectedIds.length === MISSION.survivalConfig.maxDiscards) {
+        e.preventDefault();
+        confirmEvaluation();
+      }
+      return;
+    }
+    if (state.step === 5) {
+      if (state.survival.evaluated || canEvaluatePlan()) {
+        e.preventDefault();
+        advanceToSimulation();
+      }
+      return;
+    }
+    if (state.step === 6) {
+      if (!state.survival.closingOpen) {
+        e.preventDefault();
+        continueToClosing(true);
+      }
+      return;
+    }
+  }
+
+  if (e.key === 'ArrowRight') go(state.step + 1);
+  if (e.key === 'ArrowLeft') go(state.step - 1);
+}
+
+document.addEventListener('keydown', handleGlobalKeydown);
